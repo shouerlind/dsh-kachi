@@ -1,15 +1,14 @@
 /**
  * dsh-kachi 浏览器半入口:装配播放引擎、手势解锁(含 Notification 降级)、
- * 审批/提问 pending 接线。B/C 层与设置页随工单 #11-#14 补齐。
+ * journal 接线(B 层,含审批 asked 事件)。设置页随工单 #13/#14 补齐。
  */
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
-import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
-import { createEngine, type Engine } from './engine/audio-engine.ts'
+import { createEngine } from './engine/audio-engine.ts'
 import { installUnlock } from './engine/unlock.ts'
-import { wirePending } from './wiring/pending.ts'
+import { wireLayerB } from './wiring/layer-b.ts'
 
-export const inject = ['sessions', 'uiConversation']
+export const inject = ['sessions']
 
 export function apply(ctx: Context): void {
   const engine = createEngine({ createContext: () => new AudioContext() })
@@ -26,7 +25,7 @@ export function apply(ctx: Context): void {
     return false
   })
 
-  ctx.effect(() => wirePending(ctx.sessions, ctx.uiConversation, engine), 'dsh-kachi: pending wiring')
+  ctx.effect(() => wireLayerB(ctx.sessions, engine), 'dsh-kachi: journal wiring')
 
   ctx.effect(
     () => () => {
@@ -83,5 +82,3 @@ function removeHint(): void {
   document.getElementById(HINT_ID)?.remove()
   hintShown = false
 }
-
-export type { Engine }

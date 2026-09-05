@@ -49,6 +49,8 @@ export interface EngineOptions {
   fetchImpl?: SoundFetcher
   /** 前后台判定;默认 document.visibilityState。 */
   visibility?: () => 'visible' | 'hidden'
+  /** 毫秒时钟(节流用);默认 performance.now()。 */
+  now?: () => number
 }
 
 /** 槽位当前指向的音效文件(pack = 选自全包池,URL 走 /sounds/pack/ 前缀)。 */
@@ -68,6 +70,8 @@ export interface Engine {
   setSlotVolume(slot: SlotId, percent: number): void
   /** 换槽位音效(工单 #14 选音);立即按需解码新文件。 */
   setSlotSound(slot: SlotId, file: SlotFile): Promise<void>
+  /** 节流时间窗(毫秒,同类同槽位去重;0 关闭)。 */
+  setThrottleMs(ms: number): void
   /** 卸载:关闭 AudioContext,丢弃缓存。之后 play 为空操作。 */
   dispose(): void
   /** 测试与降级路径用:AudioContext 是否 running 且已解锁。 */
@@ -88,6 +92,7 @@ export function createEngine(options: EngineOptions): Engine {
   const audioBase = options.audioBase ?? '/dsh-kachi'
   const fetchImpl = options.fetchImpl ?? ((url: string) => fetch(url))
   const visibility = options.visibility ?? defaultVisibility
+  const now = options.now ?? (() => performance.now())
 
   const ctx = options.createContext()
 
@@ -115,6 +120,8 @@ export function createEngine(options: EngineOptions): Engine {
 
   let unlocked = false
   let closed = false
+  let throttleMs = 200
+  const lastPlayedAt = new Map<SlotId, number>()
 
   function bufferKey(slotFile: SlotFile): string {
     return slotFile.pack ? `pack/${slotFile.file}` : slotFile.file
@@ -161,6 +168,9 @@ export function createEngine(options: EngineOptions): Engine {
       if (!mapping) return
       // 后台策略:hidden 仅介入级(SPEC §4 白名单)。
       if (visibility() === 'hidden' && mapping.level !== 'intervention') return
+      // 节流:同槽位在时间窗内去重(SPEC §4,默认 200ms)。
+      const playedAt = lastPlayedAt.get(mapping.slot)
+      if (throttleMs > 0 && playedAt !== undefined && now() - playedAt < throttleMs) return
       const slotFile = slotFiles.get(mapping.slot)
       const slotGain = slotGains.get(mapping.slot)
       if (!slotFile || !slotGain) return
@@ -170,6 +180,7 @@ export function createEngine(options: EngineOptions): Engine {
       source.buffer = buffer
       source.connect(slotGain)
       source.start()
+      lastPlayedAt.set(mapping.slot, now())
     },
 
     setMasterVolume(percent): void {
@@ -186,6 +197,10 @@ export function createEngine(options: EngineOptions): Engine {
     async setSlotSound(slot, file): Promise<void> {
       slotFiles.set(slot, file)
       await ensureBuffer(file)
+    },
+
+    setThrottleMs(ms): void {
+      throttleMs = Math.max(0, ms)
     },
 
     dispose(): void {

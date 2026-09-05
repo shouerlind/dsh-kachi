@@ -34,9 +34,17 @@ describe('播放引擎(工单 #9 最小形态)', () => {
 
   it('重复播放同一槽位复用已解码 buffer(两次事件各一个 source)', async () => {
     const ctx = new FakeAudioContext()
-    const engine = makeEngine(ctx)
+    let t = 0
+    const engine = createEngine({
+      createContext: () => ctx as unknown as AudioContextLike,
+      audioBase: '/test-assets',
+      fetchImpl: async () => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(8) }),
+      visibility: () => 'visible',
+      now: () => t,
+    })
     await engine.unlock()
     await engine.play('tool-call')
+    t = 500 // 越过节流窗
     await engine.play('tool-call')
     expect(ctx.sources).toHaveLength(2)
     expect(ctx.sources[0]!.buffer).toBe(ctx.sources[1]!.buffer)

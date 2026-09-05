@@ -14,19 +14,19 @@ export interface SessionBindingLike {
   readonly sessionId: string
 }
 
-export interface SessionsLike {
+export interface SessionsLike<B extends SessionBindingLike = SessionBindingLike> {
   /** 会话列表快照(ids/byId/…);binding 需要其 ids 字段。 */
   readonly list: ListStoreLike<{ ids: readonly string[] }>
   /** 纯解析 binding;未就绪返回 undefined。 */
-  binding(id: string): SessionBindingLike | undefined
+  binding(id: string): B | undefined
 }
 
-export interface TrackerHooks {
-  onAdded(binding: SessionBindingLike): void
+export interface TrackerHooks<B extends SessionBindingLike> {
+  onAdded(binding: B): void
   onRemoved(sessionId: string): void
 }
 
-export function trackSessions(sessions: SessionsLike, hooks: TrackerHooks): () => void {
+export function trackSessions<B extends SessionBindingLike>(sessions: SessionsLike<B>, hooks: TrackerHooks<B>): () => void {
   const tracked = new Set<string>()
   const detach = sessions.list.subscribe(() => {
     const ids = sessions.list.getSnapshot().ids
