@@ -1,9 +1,16 @@
 /**
- * 播放引擎(SPEC §3.3)。工单 #9 为最小形态:懒创建单例 AudioContext、
- * 手势解锁、解锁前事件丢弃;#10 完整化为 AudioBuffer 预解码缓存 +
- * master/槽位两级 GainNode + 后台策略 + 节流。
+ * 播放引擎(SPEC §3.3):单例 AudioContext(apply 即创建)、AudioBuffer 预解码
+ * 缓存、master GainNode(总音量,滑条平方映射)与每槽位 GainNode 的两级总线、
+ * Page Visibility 后台策略(hidden 仅介入级)、解锁前/停用事件丢弃不报错。
  */
-import { DEFAULT_SLOT_SOUNDS, EVENT_SOUNDS, soundUrl, type SlotId } from '../../shared/slots.ts'
+import {
+  DEFAULT_SLOT_SOUNDS,
+  DEFAULT_SLOT_VOLUMES,
+  EVENT_SOUNDS,
+  SLOT_IDS,
+  soundUrl,
+  type SlotId,
+} from '../../shared/slots.ts'
 
 /** 播放源节点最小结构(真 AudioBufferSourceNode 结构兼容;测试塞 fake)。 */
 export interface SourceNodeLike {
@@ -30,12 +37,6 @@ export interface AudioContextLike {
   createGain(): GainNodeLike
 }
 
-/** 槽位当前指向的音效文件(pack = 选自全包池,URL 走 /sounds/pack/ 前缀)。 */
-export interface SlotFile {
-  file: string
-  pack: boolean
-}
-
 /** 音效抓取器:真 fetch 的 Response 结构兼容此最小面;测试塞 fake。 */
 export interface SoundFetcher {
   (url: string): Promise<{ ok: boolean; arrayBuffer(): Promise<ArrayBuffer> }>
@@ -46,40 +47,81 @@ export interface EngineOptions {
   /** 音效路由前缀;默认 host 半注册的 /dsh-kachi。 */
   audioBase?: string
   fetchImpl?: SoundFetcher
+  /** 前后台判定;默认 document.visibilityState。 */
+  visibility?: () => 'visible' | 'hidden'
+}
+
+/** 槽位当前指向的音效文件(pack = 选自全包池,URL 走 /sounds/pack/ 前缀)。 */
+export interface SlotFile {
+  file: string
+  pack: boolean
 }
 
 export interface Engine {
-  /** 首次用户手势时调用;成功返回 true(幂等)。失败保留 suspended,后续手势可重试。 */
+  /** 首次用户手势时调用;成功返回 true(幂等)。失败保持 suspended,后续手势可重试。 */
   unlock(): Promise<boolean>
-  /** 播放一个映射事件。解锁前/停用/文件缺失时静默丢弃,不报错。 */
+  /** 播放一个映射事件。解锁前/后台/停用/文件缺失时静默丢弃,不报错。 */
   play(eventId: keyof typeof EVENT_SOUNDS): Promise<void>
+  /** 总音量 0-100(平方映射到 master GainNode)。 */
+  setMasterVolume(percent: number): void
+  /** 槽位音量 0-100(平方映射到该槽位 GainNode)。 */
+  setSlotVolume(slot: SlotId, percent: number): void
   /** 换槽位音效(工单 #14 选音);立即按需解码新文件。 */
   setSlotSound(slot: SlotId, file: SlotFile): Promise<void>
   /** 卸载:关闭 AudioContext,丢弃缓存。之后 play 为空操作。 */
   dispose(): void
-  /** 测试与降级路径用:AudioContext 是否已创建并处于 running。 */
+  /** 测试与降级路径用:AudioContext 是否 running 且已解锁。 */
   isRunning(): boolean
+}
+
+/** 滑条百分比的平方映射(人耳响度感知线性化,社区通行做法)。 */
+export function volumeGain(percent: number): number {
+  const v = Math.min(100, Math.max(0, percent)) / 100
+  return v * v
+}
+
+function defaultVisibility(): 'visible' | 'hidden' {
+  return typeof document !== 'undefined' && document.visibilityState === 'hidden' ? 'hidden' : 'visible'
 }
 
 export function createEngine(options: EngineOptions): Engine {
   const audioBase = options.audioBase ?? '/dsh-kachi'
   const fetchImpl = options.fetchImpl ?? ((url: string) => fetch(url))
+  const visibility = options.visibility ?? defaultVisibility
 
-  let ctx: AudioContextLike | undefined
-  let unlocked = false
-  let closed = false
+  const ctx = options.createContext()
+
+  const master = ctx.createGain()
+  master.connect(ctx.destination)
+  let masterVolume = 100
+  master.gain.value = volumeGain(masterVolume)
+
+  const slotGains = new Map<SlotId, GainNodeLike>()
+  const slotVolumes = new Map<SlotId, number>()
+  for (const slot of SLOT_IDS) {
+    const gain = ctx.createGain()
+    gain.connect(master)
+    const percent = DEFAULT_SLOT_VOLUMES[slot]!
+    gain.gain.value = volumeGain(percent)
+    slotGains.set(slot, gain)
+    slotVolumes.set(slot, percent)
+  }
+
   const buffers = new Map<string, AudioBuffer>()
   const slotFiles = new Map<SlotId, SlotFile>()
-  for (const slot of Object.keys(DEFAULT_SLOT_SOUNDS) as SlotId[]) {
+  for (const slot of SLOT_IDS) {
     slotFiles.set(slot, { file: DEFAULT_SLOT_SOUNDS[slot]!, pack: false })
   }
+
+  let unlocked = false
+  let closed = false
 
   function bufferKey(slotFile: SlotFile): string {
     return slotFile.pack ? `pack/${slotFile.file}` : slotFile.file
   }
 
   async function ensureBuffer(slotFile: SlotFile): Promise<AudioBuffer | undefined> {
-    if (!ctx) return undefined
+    if (closed) return undefined
     const key = bufferKey(slotFile)
     const cached = buffers.get(key)
     if (cached) return cached
@@ -88,6 +130,7 @@ export function createEngine(options: EngineOptions): Engine {
       if (!data.ok) return undefined
       const bytes = await data.arrayBuffer()
       const buffer = await ctx.decodeAudioData(bytes)
+      if (closed) return undefined
       buffers.set(key, buffer)
       return buffer
     } catch {
@@ -95,11 +138,13 @@ export function createEngine(options: EngineOptions): Engine {
     }
   }
 
+  // 启动即预解码全部默认槽位文件(SPEC §3.3),事件到达时零解码延迟。
+  void Promise.all([...slotFiles.values()].map((f) => ensureBuffer(f))).catch(() => {})
+
   return {
     async unlock(): Promise<boolean> {
       if (unlocked) return true
       if (closed) return false
-      if (!ctx) ctx = options.createContext()
       try {
         await ctx.resume()
         unlocked = true
@@ -111,18 +156,31 @@ export function createEngine(options: EngineOptions): Engine {
     },
 
     async play(eventId): Promise<void> {
-      const live = ctx
-      if (!live || closed || !unlocked) return
+      if (closed || !unlocked) return
       const mapping = EVENT_SOUNDS[eventId]
       if (!mapping) return
+      // 后台策略:hidden 仅介入级(SPEC §4 白名单)。
+      if (visibility() === 'hidden' && mapping.level !== 'intervention') return
       const slotFile = slotFiles.get(mapping.slot)
-      if (!slotFile) return
+      const slotGain = slotGains.get(mapping.slot)
+      if (!slotFile || !slotGain) return
       const buffer = await ensureBuffer(slotFile)
-      if (!buffer || closed || live.state !== 'running') return
-      const source = live.createBufferSource()
+      if (buffer === undefined || closed || ctx.state !== 'running') return
+      const source = ctx.createBufferSource()
       source.buffer = buffer
-      source.connect(live.destination)
+      source.connect(slotGain)
       source.start()
+    },
+
+    setMasterVolume(percent): void {
+      masterVolume = percent
+      master.gain.value = volumeGain(percent)
+    },
+
+    setSlotVolume(slot, percent): void {
+      slotVolumes.set(slot, percent)
+      const gain = slotGains.get(slot)
+      if (gain) gain.gain.value = volumeGain(percent)
     },
 
     async setSlotSound(slot, file): Promise<void> {
@@ -133,12 +191,11 @@ export function createEngine(options: EngineOptions): Engine {
     dispose(): void {
       closed = true
       buffers.clear()
-      void ctx?.close().catch(() => {})
-      ctx = undefined
+      void ctx.close().catch(() => {})
     },
 
     isRunning(): boolean {
-      return ctx?.state === 'running' && unlocked
+      return ctx.state === 'running' && unlocked
     },
   }
 }

@@ -1,74 +1,14 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createEngine, type AudioContextLike } from '../src/client/engine/audio-engine.ts'
-
-/** 最小 fake AudioContext:记录 source 创建/启动与 resume 调用。 */
-class FakeAudioContext implements AudioContextLike {
-  state: 'suspended' | 'running' | 'closed' = 'suspended'
-  destination = { fake: true }
-  resumeCalls = 0
-  sources: FakeSource[] = []
-  resumeResult: 'ok' | 'fail' = 'ok'
-  readonly gains: FakeGain[] = []
-
-  async resume(): Promise<void> {
-    this.resumeCalls++
-    if (this.resumeResult === 'fail') throw new DOMException('denied', 'NotAllowedError')
-    this.state = 'running'
-  }
-
-  async decodeAudioData(_data: ArrayBuffer): Promise<AudioBuffer> {
-    return { duration: 0.1 } as unknown as AudioBuffer
-  }
-
-  createBufferSource(): FakeSource {
-    const sources = this.sources
-    const src = new FakeSource()
-    sources.push(src)
-    return src
-  }
-
-  createGain(): FakeGain {
-    const gain = new FakeGain()
-    this.gains.push(gain)
-    return gain
-  }
-
-  async close(): Promise<void> {
-    this.state = 'closed'
-  }
-}
-
-class FakeSource {
-  buffer: AudioBuffer | null = null
-  connectedTo: unknown = null
-  started = 0
-  connect(node: unknown): this {
-    this.connectedTo = node
-    return this
-  }
-  start(): void {
-    this.started++
-  }
-  stop(): void {}
-}
-
-class FakeGain {
-  gain = { value: 1 }
-  connectedTo: unknown = null
-  connect(node: unknown): this {
-    this.connectedTo = node
-    return this
-  }
-  disconnect(): void {}
-}
+import { FakeAudioContext } from './fakes.ts'
 
 function makeEngine(ctx: FakeAudioContext) {
-  const engine = createEngine({
+  return createEngine({
     createContext: () => ctx as unknown as AudioContextLike,
     audioBase: '/test-assets',
     fetchImpl: async () => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(8) }),
+    visibility: () => 'visible',
   })
-  return engine
 }
 
 describe('播放引擎(工单 #9 最小形态)', () => {
@@ -86,7 +26,6 @@ describe('播放引擎(工单 #9 最小形态)', () => {
     const engine = makeEngine(ctx)
     await engine.unlock()
     expect(ctx.resumeCalls).toBe(1)
-    // boot 事件由 unlock 成功回调之外的调用方触发;这里直接验证事件播放
     await engine.play('boot')
     expect(ctx.sources).toHaveLength(1)
     expect(ctx.sources[0]!.started).toBe(1)
