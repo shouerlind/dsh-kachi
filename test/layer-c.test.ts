@@ -116,7 +116,7 @@ describe('C 层接线', () => {
   it('初始快照中的既有会话不响新建音;新增会话响', () => {
     const h = makeHarness()
     h.setIds(['a']) // 页面加载时已有会话 a(初始基线)
-    const dispose = wireLayerC(h.sessions as never, h.connection as never, { play: h.play } as never)
+    const dispose = wireLayerC(h.sessions as never, { play: h.play } as never)
     expect(h.play).not.toHaveBeenCalled()
     h.addSession('b')
     expect(h.play).toHaveBeenCalledWith('session-added')
@@ -126,7 +126,7 @@ describe('C 层接线', () => {
   it('会话移除响关闭音', () => {
     const h = makeHarness()
     h.addSession('a')
-    const dispose = wireLayerC(h.sessions as never, h.connection as never, { play: h.play } as never)
+    const dispose = wireLayerC(h.sessions as never, { play: h.play } as never)
     expect(h.play).not.toHaveBeenCalled()
     // 模拟移除:快照回到不含 a 的状态
     const snap = h.sessions.list.getSnapshot()
@@ -138,7 +138,7 @@ describe('C 层接线', () => {
 
   it('作业 running → completed 响 jobs-completed;failed 响 jobs-failed(介入级)', () => {
     const h = makeHarness()
-    const dispose = wireLayerC(h.sessions as never, h.connection as never, { play: h.play } as never)
+    const dispose = wireLayerC(h.sessions as never, { play: h.play } as never)
     h.addJob('s1', { id: 'j1', status: 'running' })
     expect(h.play).not.toHaveBeenCalled()
     h.addJob('s1', { id: 'j1', status: 'completed' })
@@ -149,21 +149,9 @@ describe('C 层接线', () => {
     dispose()
   })
 
-  it('断线响 reconnecting;恢复响 reconnected', () => {
-    const h = makeHarness()
-    h.setGeneration(true) // 页面加载时已连接
-    const dispose = wireLayerC(h.sessions as never, h.connection as never, { play: h.play } as never)
-    expect(h.play).not.toHaveBeenCalled()
-    h.setGeneration(false)
-    expect(h.play).toHaveBeenCalledWith('reconnecting')
-    h.setGeneration(true)
-    expect(h.play).toHaveBeenCalledWith('reconnected')
-    dispose()
-  })
-
   it('dispose 后一切静默', () => {
     const h = makeHarness()
-    const dispose = wireLayerC(h.sessions as never, h.connection as never, { play: h.play } as never)
+    const dispose = wireLayerC(h.sessions as never, { play: h.play } as never)
     dispose()
     h.setGeneration(false)
     h.setGeneration(true)

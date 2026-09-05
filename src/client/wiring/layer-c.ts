@@ -1,12 +1,13 @@
 /**
- * C 层接线(SPEC §3.2/§5 行 12-18):
+ * C 层接线(SPEC §5 行 12-18):
  *  - 会话生命周期:ctx.sessions.list 快照 diff → added/removed 音
  *    (0.1.2-rc.1 无 api-session/* 的 $on 转发;list 即这些事件的镜像);
  *    初始快照的既有会话是基线,不响新建音。
  *  - 后台作业:list.jobsBySession diff → completed(前台)/failed(介入);
  *    首见即终态(基线/错过)不响,killed 静默。
- *  - 连接:ctx.connection.generation — defined→undefined 警示音、
- *    undefined→defined 恢复音;页面加载的首次连接不是「重连」。
+ * 连接音不在本模块:0.1.2-rc.1 的连接状态是 controller 私有(单消费者
+ * sinks),插件无旁听通路 —— 恢复音经 journal 的重连 replace 帧在 layer-b
+ * 触发;断线警示音无通路(NOTES 记录)。
  */
 import type { Engine } from '../engine/audio-engine.ts'
 import { trackSessions, type SessionsLike } from './sessions-tracker.ts'
@@ -69,16 +70,7 @@ export class ConnectionStateMachine {
   }
 }
 
-interface GenerationLike {
-  getSnapshot(): unknown
-  subscribe(listener: () => void): () => void
-}
-
-export function wireLayerC(
-  sessions: SessionsLike,
-  connection: { generation: GenerationLike },
-  engine: Pick<Engine, 'play'>,
-): () => void {
+export function wireLayerC(sessions: SessionsLike, engine: Pick<Engine, 'play'>): () => void {
   // 会话生命周期 + 作业(同一 list 快照驱动)。
   const jobState = { seen: new Map<string, string>() }
   const disposeTracker = trackSessions(sessions, {
@@ -101,19 +93,8 @@ export function wireLayerC(
   const detachList = sessions.list.subscribe(jobsListener)
   jobsListener()
 
-  // 连接音。
-  const machine = new ConnectionStateMachine()
-  const connectionListener = (): void => {
-    const event = machine.advance(connection.generation.getSnapshot() !== undefined)
-    if (event === 'reconnecting') void engine.play('reconnecting')
-    else if (event === 'reconnected') void engine.play('reconnected')
-  }
-  const detachGeneration = connection.generation.subscribe(connectionListener)
-  connectionListener()
-
   return () => {
     disposeTracker()
     detachList()
-    detachGeneration()
   }
 }

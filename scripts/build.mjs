@@ -28,6 +28,7 @@ await build({
   format: 'cjs',
   platform: 'browser',
   target: ['es2022', 'chrome110'],
+  jsx: 'automatic', // react/jsx-runtime 在基线模块表里,不需 import React
   sourcemap: true,
   // 基线共享模块(host 种进浏览器模块表),其余源码全部打包进来。
   external: [

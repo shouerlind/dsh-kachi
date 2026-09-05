@@ -120,3 +120,25 @@ export function soundUrl(file: string, opts?: { pack?: boolean; base?: string })
   const base = opts?.base ?? '/dsh-kachi'
   return opts?.pack ? `${base}/sounds/pack/${file}` : `${base}/sounds/${file}`
 }
+
+/** 槽位中文标签(设置页 UI)。 */
+export const SLOT_LABELS: Record<SlotId, string> = {
+  boot: '开机音',
+  notifyImportant: '通知重要音',
+  taskComplete: '任务完成音',
+  error: '错误音',
+  menuMove: '菜单移动音',
+  send: '发送音',
+  button: '按键音',
+  confirm: '确认音',
+  cancel: '取消音',
+  sessionNew: '新建音',
+  sessionClose: '关闭音',
+  reconnect: '恢复音',
+  warn: '警示音',
+}
+
+/** 是否 13 个默认槽位文件之一(根目录);否则视为 pack 池内文件。 */
+export function isDefaultSound(file: string): boolean {
+  return (Object.values(DEFAULT_SLOT_SOUNDS) as string[]).includes(file)
+}

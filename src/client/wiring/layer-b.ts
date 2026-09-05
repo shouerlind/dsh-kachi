@@ -80,44 +80,56 @@ export function journalToEvent(event: JournalEventLike): EventId | undefined {
   }
 }
 
-export function wireLayerB(sessions: SessionsLike<JournalBindingLike>, engine: Pick<Engine, 'play'>): () => void {
+export function wireLayerB(
+  sessions: SessionsLike<JournalBindingLike>,
+  engine: Pick<Engine, 'play'>,
+  opts?: { now?: () => number },
+): () => void {
+  const now = opts?.now ?? (() => Date.now())
+  // 重连恢复音去重:重连后 handleConnected 会对每个会话 resync(各自产生
+  // replace 帧),5 秒窗口内只响一次恢复音。
+  let lastReconnectedAt = -Infinity
   const cleanups = new Map<string, () => void>()
 
   const disposeTracker = trackSessions(sessions, {
     onAdded(binding) {
       const source = binding.eventSource
       let lastSeq = -1
-      let primed = false
+      let replaceCount = 0
       const push = (): void => {
         const snapshot = source.getSnapshot()
         if (snapshot === undefined) {
-          primed = true
           return
         }
         const { kind, entries } = snapshot.change
         if (kind === 'replace') {
-          // 基线或重连重放:仅推进基线,不响。
           for (const entry of entries) {
             if (entry.type !== 'event' || entry.event === undefined) continue
             lastSeq = Math.max(lastSeq, entry.event.seq)
           }
-          primed = true
+          // 首个 replace 是页面加载基线;其后的 replace 来自重连恢复后的
+          // 窗口重置(handleConnected → session.resync)→ 恢复音。
+          replaceCount += 1
+          if (replaceCount >= 2) {
+            const t = now()
+            if (t - lastReconnectedAt >= 5000) {
+              lastReconnectedAt = t
+              void engine.play('reconnected')
+            }
+          }
           return
         }
         if (kind !== 'append') {
-          primed = true // prepend(翻页):历史,忽略
-          return
+          return // prepend(翻页):历史,忽略
         }
         for (const entry of entries) {
           if (entry.type !== 'event' || entry.event === undefined) continue
           const seq = entry.event.seq
           if (seq <= lastSeq) continue
           lastSeq = seq
-          if (!primed) continue
           const event = journalToEvent(entry.event)
           if (event !== undefined) void engine.play(event)
         }
-        primed = true
       }
       const detach = source.subscribe(push)
       push() // 首快照:建立 seq 基线,不响

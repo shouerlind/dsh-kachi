@@ -70,8 +70,14 @@ export interface Engine {
   setSlotVolume(slot: SlotId, percent: number): void
   /** 换槽位音效(工单 #14 选音);立即按需解码新文件。 */
   setSlotSound(slot: SlotId, file: SlotFile): Promise<void>
+  /** 槽位当前文件名(设置策略防重复下发用)。 */
+  currentSlotFile(slot: SlotId): string | undefined
   /** 节流时间窗(毫秒,同类同槽位去重;0 关闭)。 */
   setThrottleMs(ms: number): void
+  /** 总开关(SPEC §6):false 时一切映射事件静默。 */
+  setEnabled(enabled: boolean): void
+  /** 设置页试听:绕过总开关/后台/节流,直连 master 总线(总音量仍生效)。 */
+  preview(file: SlotFile): Promise<void>
   /** 卸载:关闭 AudioContext,丢弃缓存。之后 play 为空操作。 */
   dispose(): void
   /** 测试与降级路径用:AudioContext 是否 running 且已解锁。 */
@@ -120,6 +126,7 @@ export function createEngine(options: EngineOptions): Engine {
 
   let unlocked = false
   let closed = false
+  let enabled = true
   let throttleMs = 200
   const lastPlayedAt = new Map<SlotId, number>()
 
@@ -163,7 +170,7 @@ export function createEngine(options: EngineOptions): Engine {
     },
 
     async play(eventId): Promise<void> {
-      if (closed || !unlocked) return
+      if (closed || !unlocked || !enabled) return
       const mapping = EVENT_SOUNDS[eventId]
       if (!mapping) return
       // 后台策略:hidden 仅介入级(SPEC §4 白名单)。
@@ -199,8 +206,26 @@ export function createEngine(options: EngineOptions): Engine {
       await ensureBuffer(file)
     },
 
+    currentSlotFile(slot): string | undefined {
+      return slotFiles.get(slot)?.file
+    },
+
     setThrottleMs(ms): void {
       throttleMs = Math.max(0, ms)
+    },
+
+    setEnabled(value): void {
+      enabled = value
+    },
+
+    async preview(file): Promise<void> {
+      if (closed || !unlocked) return
+      const buffer = await ensureBuffer(file)
+      if (buffer === undefined || closed || ctx.state !== 'running') return
+      const source = ctx.createBufferSource()
+      source.buffer = buffer
+      source.connect(master)
+      source.start()
     },
 
     dispose(): void {
