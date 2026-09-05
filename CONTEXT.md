@@ -1,6 +1,6 @@
 # CONTEXT.md — 术语表
 
-ns-notify:dsh 的音效插件,为 dsh 的所有操作提供任天堂 Switch 系统同款音效反馈,「事事有回应」。
+ns-notify:dsh 的音效插件,为 dsh 的所有操作提供任天堂 Switch 系统同款音效反馈,「事事有回应」。npm 包名 **dsh-kachi**(dsh- 前缀 + Switch 按键声「カチッ」)。
 
 ## 词汇
 
