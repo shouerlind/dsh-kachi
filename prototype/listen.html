@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<!-- PROTOTYPE 原型件:工单 #6 试听验收用,双击打开,用完即弃(结论记录进工单)。 -->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>ns-notify 音效试听原型(工单 #6)</title>
+<style>
+  body { background:#2d2d2d; color:#eee; font-family:"Segoe UI",system-ui,sans-serif; max-width:860px; margin:24px auto; padding:0 16px; }
+  h1 { font-size:20px; } h1 small { color:#999; font-weight:normal; font-size:13px; }
+  table { width:100%; border-collapse:collapse; margin-top:12px; }
+  td,th { padding:6px 8px; border-bottom:1px solid #444; text-align:left; font-size:14px; }
+  th { color:#0ff; font-weight:600; }
+  .vol { color:#aaa; font-size:12px; }
+  button { background:#0ff2; color:#eee; border:1px solid #0ff6; border-radius:4px; padding:4px 10px; cursor:pointer; }
+  button:hover { background:#0ff4; }
+  .tools { margin:14px 0; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .note { color:#999; font-size:12px; margin-top:14px; line-height:1.6; }
+  .playing { background:#0ff2; }
+  input[type=file] { color:#aaa; font-size:12px; max-width:230px; }
+</style>
+</head>
+<body>
+<h1>ns-notify 音效试听 <small>工单 #6 · 13 槽位按映射表音量播放 · 结论回写工单</small></h1>
+
+<div class="tools">
+  <button id="playall">▶ 顺序全放一遍</button>
+  <button id="burst">⚡ 模拟连发(button@30% ×10,感受节流场景)</button>
+  <label>试听备选 wav:<input type="file" id="pick" accept="audio/*" multiple></label>
+  <span id="status"></span>
+</div>
+
+<h1 style="font-size:16px">v3:撞车调配 <small>5 个槽位已换家族,重点验收 1/3/6/8/12</small></h1>
+<table>
+  <tr><th>槽位 = 当前</th><th>播放</th><th>候选(不满意时换)</th></tr>
+  <tr><td><b>1. 开机音</b>=SeDeviceFound_Dtt 0.82s</td>
+    <td><button data-play="boot.wav" data-vol="100">▶</button></td>
+    <td id="c1"></td></tr>
+  <tr><td><b>3. 任务完成音</b>=SeVgc_Dialog_Check 0.50s</td>
+    <td><button data-play="task-complete.wav" data-vol="100">▶</button></td>
+    <td id="c3"></td></tr>
+  <tr><td><b>6. 发送音</b>=SeVgc_Connect_Recieve 0.44s</td>
+    <td><button data-play="send.wav" data-vol="100">▶</button></td>
+    <td id="c6"></td></tr>
+  <tr><td><b>8. 确认音</b>=SeToggleBtnOn 0.11s(高频,播60%)</td>
+    <td><button data-play="confirm.wav" data-vol="60">▶</button></td>
+    <td id="c8"></td></tr>
+  <tr><td><b>12. 恢复音</b>=SePage 0.73s(轻翻页)</td>
+    <td><button data-play="reconnect.wav" data-vol="100">▶</button></td>
+    <td id="c12"></td></tr>
+</table>
+<div class="note">v3 变更:开机→SeDeviceFound_Dtt(发现设备),任务完成→SeVgc_Dialog_Check,发送→SeVgc_Connect_Recieve,确认→SeToggleBtnOn(短勾选,与按键/取消拉开),恢复→SePage。2 通知=SeKeyRecieved、10/11 新建/关闭=FlcIconFloat/Sink 成对保留。</div>
+
+<table id="tbl">
+  <tr><th>槽位 / 文件</th><th>映射事件</th><th>音量</th><th></th></tr>
+</table>
+
+<div class="note">
+  用法:逐行 ▶ 听;「低」按钮播该槽位的低音量变体。不满意记住行号,回工单告诉我换哪个方向(更轻/更重/更活泼/更严肃)。
+  备选:用上面文件选择器直接试听 Nintendo-Switch-Sounds-Effect 仓库里任意 wav。
+  <br>PROTOTYPE:本页为一次性原型,验收结论记录进工单 #6 后此文件即弃(不入 main)。
+</div>
+
+<script>
+const ROWS = [
+  ['boot.wav','开机音','页面加载完成且音频解锁',100],
+  ['notify-important.wav','通知重要音','审批请求 / agent 提问(介入级)',100],
+  ['task-complete.wav','任务完成音','回合完成(介入级);后台作业完成@轻',100],
+  ['error.wav','错误音','回合错误(介入级);后台作业失败',100],
+  ['menu-move.wav','菜单移动音','agent 开始干活(turn/start)',40],
+  ['send.wav','发送音','用户发送消息',100],
+  ['button.wav','按键音','tool/call@低音量;自家组件点击',30],
+  ['confirm.wav','确认音','tool/result 成功@轻',60],
+  ['cancel.wav','取消音','用户手动中止回合',100],
+  ['session-new.wav','新建音','新会话出现',100],
+  ['session-close.wav','关闭音','会话关闭',100],
+  ['reconnect.wav','恢复音','断线恢复',100],
+  ['warn.wav','警示音','断线警示',90],
+];const tbl = document.getElementById('tbl'), status = document.getElementById('status');
+const LOW = { 'error.wav':0.7 };  // 低音量变体
+ROWS.forEach(([f,slot,ev,vol],i)=>{
+  const tr=document.createElement('tr');
+  tr.innerHTML=`<td>${i+1}. <b>${slot}</b> <span class="vol">${f}</span></td><td class="vol">${ev}</td>
+    <td class="vol">${vol}%${LOW[f]?`<br><button data-low="${f}">低</button>`:''}</td>
+    <td><button data-play="${f}" data-vol="${vol}">▶</button></td>`;
+  tbl.appendChild(tr);
+});
+function play(f, vol=1){
+  const a=new Audio('../assets/sounds/'+f); a.volume=vol;
+  a.play().then(()=>{ status.textContent='正在播放:'+f; });
+  return a;
+}
+tbl.addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  if(b.dataset.play) play(b.dataset.play, b.dataset.vol/100);
+  if(b.dataset.low)  play(b.dataset.low, LOW[b.dataset.low]);
+});
+document.getElementById('playall').onclick=async()=>{
+  for(const [f,,,v] of ROWS){ play(f,v/100); await new Promise(r=>setTimeout(r,1200)); }
+};
+document.getElementById('burst').onclick=async()=>{
+  status.textContent='模拟连发中…';
+  for(let i=0;i<10;i++){
+    play('button.wav',0.3);
+    await new Promise(r=>setTimeout(r,120+Math.random()*280));
+  }
+  status.textContent='连发结束';
+};
+document.getElementById('pick').onchange=e=>{
+  [...e.target.files].forEach(f=>{
+    const a=new Audio(URL.createObjectURL(f)); a.play().then(()=>status.textContent='备选:'+f.name);
+  });
+};
+const CAND2=[['SeDialogOpen_Accent','对话框·强调 0.8s'],['SeVgc_Connect_Recieve','接收连接 0.44s'],['SeGiftReceive','礼物接收 0.0s(碎片)'],['SeOptPointGet','积分到手 0.0s(碎片)']];
+const CAND12=[['SeNewsBookmark','书签 0.09s'],['SeToggleBtnOn','开关 0.11s'],['SeRefreshIn','刷新入 0.02s(碎片)'],['SePage','翻页 0.73s']];
+const CAND3=[['SeVgc_Dialog_Check','对话框确认 0.50s'],['SeVgc_Connect_Recieve','接收连接 0.44s']];
+function candButtons(list,td){
+  td.innerHTML=list.map(([f,label])=>`<button data-cand="_cand/${f}.wav">▶ ${label}<br><span class="vol">${f}</span></button>`).join(' ');
+}
+candButtons([['StartupAlbum','启动相册 0.7s'],['SeUnlockReset','解锁重置 0.76s'],['SeVgc_Paring_Fix','配对完成 1.0s']],document.getElementById('c1'));
+candButtons([['SeMeterKeyDecide','仪表确认 0.73s'],['SeUnlockKeyL','解锁L 0.7s']],document.getElementById('c3'));
+candButtons([['SeNewsChannelRegister','频道注册 0.11s'],['SeNewsNice','点赞 0.05s']],document.getElementById('c6'));
+candButtons([['SeCheckboxOn','勾选开 0.10s'],['SeIconMove','图标移动 0.11s'],['SeGameIconAdd','图标加入 0.07s']],document.getElementById('c8'));
+candButtons([['SeNewsBookmark','书签 0.09s'],['SeUnlockReset','解锁重置 0.76s'],['SeMeterKeyDecide','仪表确认 0.73s']],document.getElementById('c12'));
+document.body.addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b||!b.dataset.cand) return;
+  const a=new Audio(b.dataset.cand); a.play().then(()=>status.textContent='候选:'+b.textContent.trim());
+});
+</script>
+</body>
+</html>
