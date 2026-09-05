@@ -19,7 +19,7 @@ class FakeListStore {
 }
 
 describe('会话跟踪器(工单 #10/#11 共用)', () => {
-  it('初始快照的会话逐个 onAdded(binding)', () => {
+  it('初始快照的会话逐个 onAdded(binding, initial=true)', () => {
     const store = new FakeListStore({ ids: ['a', 'b'] })
     const bindings = new Map([
       ['a', { sessionId: 'a' }],
@@ -32,11 +32,12 @@ describe('会话跟踪器(工单 #10/#11 共用)', () => {
       { onAdded, onRemoved },
     )
     expect(onAdded).toHaveBeenCalledTimes(2)
-    expect(onAdded).toHaveBeenCalledWith(expect.objectContaining({ sessionId: 'a' }))
+    expect(onAdded).toHaveBeenCalledWith(expect.objectContaining({ sessionId: 'a' }), true)
+    expect(onAdded).toHaveBeenCalledWith(expect.objectContaining({ sessionId: 'b' }), true)
     dispose()
   })
 
-  it('binding 尚未就绪时延后,后续快照再补挂', () => {
+  it('binding 尚未就绪时延后,后续快照再补挂(此时 initial=false)', () => {
     const store = new FakeListStore({ ids: ['a'] })
     const bindings = new Map<string, { sessionId: string }>()
     const onAdded = vi.fn()
@@ -44,7 +45,7 @@ describe('会话跟踪器(工单 #10/#11 共用)', () => {
     expect(onAdded).not.toHaveBeenCalled()
     bindings.set('a', { sessionId: 'a' })
     store.emit(['a'])
-    expect(onAdded).toHaveBeenCalledWith(expect.objectContaining({ sessionId: 'a' }))
+    expect(onAdded).toHaveBeenCalledWith(expect.objectContaining({ sessionId: 'a' }), false)
     dispose()
   })
 

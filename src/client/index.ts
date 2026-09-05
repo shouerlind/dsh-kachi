@@ -4,11 +4,13 @@
  */
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
+import type {} from '@deepseek-ai/dsh-client-connection/client'
 import { createEngine } from './engine/audio-engine.ts'
 import { installUnlock } from './engine/unlock.ts'
 import { wireLayerB } from './wiring/layer-b.ts'
+import { wireLayerC } from './wiring/layer-c.ts'
 
-export const inject = ['sessions']
+export const inject = ['sessions', 'connection']
 
 export function apply(ctx: Context): void {
   const engine = createEngine({ createContext: () => new AudioContext() })
@@ -26,6 +28,8 @@ export function apply(ctx: Context): void {
   })
 
   ctx.effect(() => wireLayerB(ctx.sessions, engine), 'dsh-kachi: journal wiring')
+
+  ctx.effect(() => wireLayerC(ctx.sessions, ctx.connection, engine), 'dsh-kachi: lifecycle wiring')
 
   ctx.effect(
     () => () => {

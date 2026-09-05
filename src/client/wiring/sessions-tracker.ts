@@ -22,13 +22,17 @@ export interface SessionsLike<B extends SessionBindingLike = SessionBindingLike>
 }
 
 export interface TrackerHooks<B extends SessionBindingLike> {
-  onAdded(binding: B): void
+  /**
+   * @param initial - true 表示这是页面加载时对既有会话的初始派发(基线),
+   * 消费者据此区分「新建会话」与「快照回放」。
+   */
+  onAdded(binding: B, initial: boolean): void
   onRemoved(sessionId: string): void
 }
 
 export function trackSessions<B extends SessionBindingLike>(sessions: SessionsLike<B>, hooks: TrackerHooks<B>): () => void {
   const tracked = new Set<string>()
-  const detach = sessions.list.subscribe(() => {
+  const dispatch = (initial: boolean): void => {
     const ids = sessions.list.getSnapshot().ids
     const next = new Set(ids)
     for (const id of ids) {
@@ -36,7 +40,7 @@ export function trackSessions<B extends SessionBindingLike>(sessions: SessionsLi
       const binding = sessions.binding(id)
       if (binding === undefined) continue
       tracked.add(id)
-      hooks.onAdded(binding)
+      hooks.onAdded(binding, initial)
     }
     for (const id of [...tracked]) {
       if (!next.has(id)) {
@@ -44,15 +48,10 @@ export function trackSessions<B extends SessionBindingLike>(sessions: SessionsLi
         hooks.onRemoved(id)
       }
     }
-  })
-  // 首次派发在订阅挂上之后手动触发一次(订阅本身不回放)。
-  const initial = sessions.list.getSnapshot().ids
-  for (const id of initial) {
-    const binding = sessions.binding(id)
-    if (binding === undefined) continue
-    tracked.add(id)
-    hooks.onAdded(binding)
   }
+  const detach = sessions.list.subscribe(() => dispatch(false))
+  // 首次派发在订阅挂上之后手动触发一次(订阅本身不回放)。
+  dispatch(true)
   return () => {
     detach()
     tracked.clear()
