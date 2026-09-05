@@ -22,16 +22,6 @@ import { KachiGeneralRow, KachiSlotsRow, type KachiInject } from './settings/set
 export const inject = ['sessions', 'settingsScope', 'slots', 'locale']
 
 export function apply(ctx: Context): void {
-  try {
-    applyInner(ctx)
-  } catch (error) {
-    ;(window as unknown as Record<string, unknown>).__kachiApplyError =
-      error instanceof Error ? (error.stack ?? error.message) : String(error)
-    throw error
-  }
-}
-
-function applyInner(ctx: Context): void {
   const engine = createEngine({ createContext: () => new AudioContext() })
 
   const controller = bindKachiSettings((spec) => ctx.settingsScope.bind<KachiSettings>(spec))
@@ -39,6 +29,10 @@ function applyInner(ctx: Context): void {
     settings: controller,
     preview: (file, pack) => {
       void engine.preview({ file, pack })
+    },
+    // 自家注入组件点击 → 按键音(SPEC §5 行 18)。
+    click: () => {
+      void engine.play('own-click')
     },
   }
 
@@ -72,45 +66,18 @@ function applyInner(ctx: Context): void {
 
   ctx.effect(() => wireLayerC(ctx.sessions, engine), 'dsh-kachi: lifecycle wiring')
 
-  // 设置页两行 + 诊断行(slots.inject 挂调用方 fiber,官方插件均为顶层调用)。
-  const kachiWindow = window as unknown as Record<string, unknown>
-  const trackInject = (id: string, run: () => unknown): unknown => {
-    try {
-      const handle = run()
-      const ran = (kachiWindow.__kachiInjectOk as string[] | undefined) ?? []
-      ran.push(id)
-      kachiWindow.__kachiInjectOk = ran
-      return handle
-    } catch (error) {
-      const errs = (kachiWindow.__kachiInjectErr as string[] | undefined) ?? []
-      errs.push(`${id}: ${error instanceof Error ? error.message : String(error)}`)
-      kachiWindow.__kachiInjectErr = errs
-      return undefined
-    }
-  }
+  // 设置页两行(slots.inject 挂调用方 fiber,官方插件均为顶层调用)。
   const settingsUIDisposers = [
     ctx.slots.inject('settings.general.item', () =>
-      trackInject('test', () =>
-        ctx.slots.register({ name: 'settings.general.item', id: 'dsh-kachi-test', order: 59 }, function KachiTestRow() {
-          ;(window as unknown as Record<string, unknown>).__kachiRowRendered = true
-          return null
-        }),
+      ctx.slots.register(
+        { name: 'settings.general.item', id: 'dsh-kachi-general', order: 60, locale: 'dsh-kachi', inject: () => injectFace },
+        KachiGeneralRow,
       ),
     ),
     ctx.slots.inject('settings.general.item', () =>
-      trackInject('general', () =>
-        ctx.slots.register(
-          { name: 'settings.general.item', id: 'dsh-kachi-general', order: 60, locale: 'dsh-kachi', inject: () => injectFace },
-          KachiGeneralRow,
-        ),
-      ),
-    ),
-    ctx.slots.inject('settings.general.item', () =>
-      trackInject('slots', () =>
-        ctx.slots.register(
-          { name: 'settings.general.item', id: 'dsh-kachi-slots', order: 61, locale: 'dsh-kachi', inject: () => injectFace },
-          KachiSlotsRow,
-        ),
+      ctx.slots.register(
+        { name: 'settings.general.item', id: 'dsh-kachi-slots', order: 61, locale: 'dsh-kachi', inject: () => injectFace },
+        KachiSlotsRow,
       ),
     ),
   ]

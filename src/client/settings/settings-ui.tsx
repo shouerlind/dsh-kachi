@@ -6,13 +6,15 @@
  * 控件用原生元素 + kachi- 前缀内联样式;注入面走非 hooks 成员(原样进 props)。
  */
 import { useSyncExternalStore } from 'react'
-import { isDefaultSound, SLOT_IDS, SLOT_LABELS } from '../../shared/slots.ts'
+import { DEFAULT_SLOT_SOUNDS, isDefaultSound, SLOT_IDS, SLOT_LABELS } from '../../shared/slots.ts'
 import type { KachiSettingsController } from './controller.ts'
 import packManifest from '../pack-manifest.json'
 
 export interface KachiInject {
   settings: KachiSettingsController
   preview(file: string, pack: boolean): void
+  /** 自家组件点击 → 按键音(SPEC §5 行 18)。 */
+  click(): void
 }
 
 interface PackEntry {
@@ -42,11 +44,11 @@ function ensureStyle(): void {
   document.head.append(style)
 }
 
-function GeneralRow({ settings, preview: _preview }: KachiInject): JSX.Element {
+function GeneralRow({ settings, click }: KachiInject): JSX.Element {
   ensureStyle()
   const settingsView = useSyncExternalStore(settings.subscribe, settings.getSnapshot)
   return (
-    <div className="kachi-row">
+    <div className="kachi-row" onClick={click}>
       <label className="kachi-field">
         <input
           type="checkbox"
@@ -94,11 +96,13 @@ function durLabel(dur: PackEntry['dur']): string {
   return dur === null ? '' : dur < 0.1 ? `(<0.1s)` : `(${dur.toFixed(2)}s)`
 }
 
-function SlotsRow({ settings, preview }: KachiInject): JSX.Element {
+function SlotsRow({ settings, preview, click }: KachiInject): JSX.Element {
   ensureStyle()
   const settingsView = useSyncExternalStore(settings.subscribe, settings.getSnapshot)
   const setSlotSound = (slot: string, file: string): void => {
     settings.set('slotSounds', { ...settingsView.slotSounds, [slot]: file })
+    // 选音即试听候选(SPEC §14「逐项试听」):切音立即听新音效。
+    preview(file, !isDefaultSound(file))
   }
   const setSlotVolume = (slot: string, percent: number): void => {
     settings.set('slotVolumes', { ...settingsView.slotVolumes, [slot]: percent })
@@ -108,7 +112,7 @@ function SlotsRow({ settings, preview }: KachiInject): JSX.Element {
     if (file !== undefined) preview(file, !isDefaultSound(file))
   }
   return (
-    <div className="kachi-row">
+    <div className="kachi-row" onClick={click}>
       <div className="kachi-title">音效槽位(选音 / 试听 / 音量;标注时长,选音须语义与时长 ≥0.1s 兼顾)</div>
       {SLOT_IDS.map((slot) => {
         const current = settingsView.slotSounds[slot] ?? ''
@@ -119,11 +123,10 @@ function SlotsRow({ settings, preview }: KachiInject): JSX.Element {
             <select value={current} onChange={(e) => setSlotSound(slot, e.target.value)}>
               <optgroup label="默认(13 槽位)">
                 {SLOT_IDS.map((s) => {
-                  const file = settingsView.slotSounds[s] ?? ''
-                  const def = DEFAULT_LABELS[s]
+                  const def = DEFAULT_SLOT_FILES[s]
                   return (
-                    <option key={s} value={file}>
-                      {def === undefined ? file : def}
+                    <option key={s} value={def}>
+                      {SLOT_LABELS[s]} · {def}
                     </option>
                   )
                 })}
@@ -154,14 +157,7 @@ function SlotsRow({ settings, preview }: KachiInject): JSX.Element {
   )
 }
 
-/** 每个默认槽位在 optgroup 里的展示名(槽位名 + 当前默认文件名)。 */
-const DEFAULT_LABELS: Record<string, string> = Object.fromEntries(
-  SLOT_IDS.map((slot) => [slot, `${SLOT_LABELS[slot]}`]),
-)
-
-/** 供 slots.register 的 inject 回调使用的注入面。 */
-export function makeInjectFace(kachi: KachiInject): { kachi: KachiInject } {
-  return { kachi }
-}
+/** 默认槽位文件(选音器「默认」组的固定取值)。 */
+const DEFAULT_SLOT_FILES: Record<string, string> = { ...DEFAULT_SLOT_SOUNDS }
 
 export { GeneralRow as KachiGeneralRow, SlotsRow as KachiSlotsRow }

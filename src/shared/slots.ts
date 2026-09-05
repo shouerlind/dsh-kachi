@@ -110,10 +110,19 @@ export const EVENT_SOUNDS: Record<EventId, { slot: SlotId; level: Level; volume:
   'own-click': { slot: 'button', level: 'foreground', volume: 100 },
 }
 
-/** 介入级事件全集 = 后台白名单(CONTEXT.md「重要通知白名单」,变更需显式决议)。 */
-export const INTERVENTION_EVENT_IDS: ReadonlySet<EventId> = new Set(
-  EVENT_IDS.filter((id) => EVENT_SOUNDS[id].level === 'intervention'),
-)
+/**
+ * 介入级事件白名单 = 后台可发声的固定清单(CONTEXT.md「重要通知白名单」,
+ * 变更需显式决议)。字面量固定清单,不随 level 字段自动派生。
+ * 语义四类:审批请求、agent 提问、回合错误(回合/会话/作业失败)、任务完成。
+ */
+export const INTERVENTION_EVENT_IDS: ReadonlySet<EventId> = new Set<EventId>([
+  'approval-request',
+  'questions-request',
+  'turn-end-completed',
+  'turn-end-error',
+  'session-error',
+  'jobs-failed',
+])
 
 /** 音效文件 URL:host 半注册的 /dsh-kachi 前缀路由。 */
 export function soundUrl(file: string, opts?: { pack?: boolean; base?: string }): string {

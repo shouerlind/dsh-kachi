@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { ConnectionStateMachine, diffJobs, wireLayerC } from '../src/client/wiring/layer-c.ts'
+import { diffJobs, wireLayerC } from '../src/client/wiring/layer-c.ts'
 
 describe('jobs diff(工单 #12:后台作业完成/失败)', () => {
   it('基线中已终态的作业不响(页面加载不回放)', () => {
@@ -33,29 +33,6 @@ describe('jobs diff(工单 #12:后台作业完成/失败)', () => {
     const state = { seen: new Map([['j1', 'running']]) }
     expect(diffJobs(state, [{ id: 'j1', status: 'completed' }]).completed).toEqual(['j1'])
     expect(diffJobs(state, [{ id: 'j1', status: 'completed' }]).completed).toEqual([])
-  })
-})
-
-describe('连接状态机(工单 #12:断线警示/重连恢复)', () => {
-  it('页面加载即已连接:首次不响恢复音', () => {
-    const sm = new ConnectionStateMachine()
-    expect(sm.advance(true)).toBeUndefined()
-    expect(sm.advance(true)).toBeUndefined()
-  })
-
-  it('连接后断线 → reconnecting;恢复 → reconnected', () => {
-    const sm = new ConnectionStateMachine()
-    sm.advance(true)
-    expect(sm.advance(false)).toBe('reconnecting')
-    expect(sm.advance(true)).toBe('reconnected')
-    expect(sm.advance(false)).toBe('reconnecting')
-    expect(sm.advance(true)).toBe('reconnected')
-  })
-
-  it('页面加载即断线(未连过):不响', () => {
-    const sm = new ConnectionStateMachine()
-    expect(sm.advance(false)).toBeUndefined()
-    expect(sm.advance(true)).toBeUndefined() // 首次连接也不是「重连」
   })
 })
 

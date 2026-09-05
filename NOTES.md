@@ -22,3 +22,31 @@
 - kachi-test profile(~/.dsh/profiles/kachi-test,bundles: base + web-app + dsh-kachi)。
 - 启动:`node "C:\Users\kona\AppData\Roaming\npm\node_modules\@deepseek-ai\dsh\lib\bin.js" --profile kachi-test --port 3099`(在 ~ 下执行)。
 - 浏览器已验证:boot graph 含 dsh-kachi、点击解锁后 fetch boot.wav、无 console 错误。
+
+## 通路差异与缺口(0.1.2-rc.1 实测,评审确认)
+
+- **审批音**:journal 审计事件 `approval/asked`(该版本无 approval/request 的 $on 转发)。
+- **提问专属音**:无插件可旁听通路(`question/requested` mux 帧镜像为 runtime 私有 pending,
+  journal 无记录);提问时刻 tool/call 按键音仍响。dsh 恢复通路后可接。
+- **断线警示音(reconnecting)**:连接状态是 ConnectionController 私有(单消费者 sinks),
+  无旁听通路 → 未实现;**恢复音**经 journal 重连后 resync 的 replace 帧触发(5s 窗口去重,
+  seq-gap 修复可能偶发误报,可接受)。
+- **api-session/error**:无转发、无 journal 审计;错误面由 turn-end-error + jobs-failed 覆盖。
+- **事件音量系数**(§5 音量列):per-shot GainNode 线性系数 ×(槽位²×总²平方映射)。
+
+## 评审修复(code-review)
+
+- 事件音量系数落地(play 读 mapping.volume);节流占位提前到解码前防并发双响。
+- 选音器「默认」组改用 DEFAULT_SLOT_SOUNDS 固定取值(原实现引用当前值会漂移);
+  选音 onChange 自动试听候选(§14 逐项试听)。
+- own-click 接线:设置行容器 onClick → 按键音(§5 行 18)。
+- 白名单改为字面量固定清单(§CONTEXT.md「固定清单/显式决议」),不再随 level 派生。
+- 移除调试脚手架(KachiTestRow/trackInject/__kachi* 探针)、死代码
+  (ConnectionStateMachine/isRunning/makeInjectFace)。
+
+## 主 profile 收尾步骤(用户执行)
+
+1. 重启 dsh 主实例(restart-dsh.ps1)→ dsh-kachi 装载(host 半 + client 半)。
+2. 走查 SPEC §9 五条(见工单 #15),音效试听:点击页面 → 开机音;
+   发消息/工具调用/回合完成/审批弹窗各音;设置页(设置 → 通用设置底部)调音量/换音/试听。
+3. 与 dsh-notifier 共存:两者都会对审批/完成出声,若刺耳,用本插件总开关调停(SPEC §8)。

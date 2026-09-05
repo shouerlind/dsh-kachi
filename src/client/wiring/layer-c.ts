@@ -54,22 +54,6 @@ export function diffJobs(
   return { completed, failed }
 }
 
-/** 连接代际状态机:从页面加载视角区分「首次连接」「断线」「重连」。 */
-export class ConnectionStateMachine {
-  private phase: 'init' | 'connected' | 'disconnected' = 'init'
-
-  advance(hasGeneration: boolean): 'reconnecting' | 'reconnected' | undefined {
-    if (hasGeneration) {
-      const was = this.phase
-      this.phase = 'connected'
-      return was === 'disconnected' ? 'reconnected' : undefined
-    }
-    const was = this.phase
-    if (was === 'connected') this.phase = 'disconnected'
-    return was === 'connected' ? 'reconnecting' : undefined
-  }
-}
-
 export function wireLayerC(sessions: SessionsLike, engine: Pick<Engine, 'play'>): () => void {
   // 会话生命周期 + 作业(同一 list 快照驱动)。
   const jobState = { seen: new Map<string, string>() }

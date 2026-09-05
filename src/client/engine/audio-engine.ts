@@ -80,8 +80,6 @@ export interface Engine {
   preview(file: SlotFile): Promise<void>
   /** 卸载:关闭 AudioContext,丢弃缓存。之后 play 为空操作。 */
   dispose(): void
-  /** 测试与降级路径用:AudioContext 是否 running 且已解锁。 */
-  isRunning(): boolean
 }
 
 /** 滑条百分比的平方映射(人耳响度感知线性化,社区通行做法)。 */
@@ -175,9 +173,11 @@ export function createEngine(options: EngineOptions): Engine {
       if (!mapping) return
       // 后台策略:hidden 仅介入级(SPEC §4 白名单)。
       if (visibility() === 'hidden' && mapping.level !== 'intervention') return
-      // 节流:同槽位在时间窗内去重(SPEC §4,默认 200ms)。
+      // 节流:同槽位在时间窗内去重(SPEC §4,默认 200ms)。闸后立即占位,
+      // 防止并发同槽事件在解码延迟窗口内双响。
       const playedAt = lastPlayedAt.get(mapping.slot)
       if (throttleMs > 0 && playedAt !== undefined && now() - playedAt < throttleMs) return
+      lastPlayedAt.set(mapping.slot, now())
       const slotFile = slotFiles.get(mapping.slot)
       const slotGain = slotGains.get(mapping.slot)
       if (!slotFile || !slotGain) return
@@ -185,9 +185,16 @@ export function createEngine(options: EngineOptions): Engine {
       if (buffer === undefined || closed || ctx.state !== 'running') return
       const source = ctx.createBufferSource()
       source.buffer = buffer
-      source.connect(slotGain)
+      // 事件音量系数(SPEC §5 音量列,线性;槽位/总音量已平方映射)。
+      if (mapping.volume < 100) {
+        const shot = ctx.createGain()
+        shot.gain.value = mapping.volume / 100
+        shot.connect(slotGain)
+        source.connect(shot)
+      } else {
+        source.connect(slotGain)
+      }
       source.start()
-      lastPlayedAt.set(mapping.slot, now())
     },
 
     setMasterVolume(percent): void {
@@ -234,8 +241,5 @@ export function createEngine(options: EngineOptions): Engine {
       void ctx.close().catch(() => {})
     },
 
-    isRunning(): boolean {
-      return ctx.state === 'running' && unlocked
-    },
   }
 }
