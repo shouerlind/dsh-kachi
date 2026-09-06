@@ -50,3 +50,9 @@
 2. 走查 SPEC §9 五条(见工单 #15),音效试听:点击页面 → 开机音;
    发消息/工具调用/回合完成/审批弹窗各音;设置页(设置 → 通用设置底部)调音量/换音/试听。
 3. 与 dsh-notifier 共存:两者都会对审批/完成出声,若刺耳,用本插件总开关调停(SPEC §8)。
+
+## 验证环境清理(2026-09-06 验收后)
+
+- kachi-test profile 与 C:\dsh-kachi-dev junction 已删除(启动器不再显示第三个 dsh)。
+- 主力 web profile 配置就绪:dependencies link + bundles 注册 + cordis.patch.yml insert,
+  重启主实例即装载。
