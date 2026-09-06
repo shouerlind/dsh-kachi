@@ -56,3 +56,10 @@
 - kachi-test profile 与 C:\dsh-kachi-dev junction 已删除(启动器不再显示第三个 dsh)。
 - 主力 web profile 配置就绪:dependencies link + bundles 注册 + cordis.patch.yml insert,
   重启主实例即装载。
+
+## 收官(2026-09-06)
+
+- 用户以 dsh 启动器启动主力 web profile(restart-dsh.ps1 非用户日常启动方式),走查 §9 五条全过;
+  工单 #9–#15 全部关闭,项目交付。
+- 日常开发注意:改代码后 `npm run build`(client.js 由 HMR 自动重载);改 host 半或 package.json
+  才需经启动器重启 dsh。
