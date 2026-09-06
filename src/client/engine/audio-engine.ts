@@ -7,6 +7,7 @@ import {
   DEFAULT_SLOT_SOUNDS,
   DEFAULT_SLOT_VOLUMES,
   EVENT_SOUNDS,
+  INTERACTION_EVENT_IDS,
   SLOT_IDS,
   soundUrl,
   type SlotId,
@@ -88,6 +89,16 @@ export function volumeGain(percent: number): number {
   return v * v
 }
 
+/**
+ * 单声道槽位(SPEC §4 节流例外):悬停扫选/键盘移动是合法高频连响,
+ * 不套 200ms 去重,改用固定 50ms 最小间隔,且新响立即打断上一响(不叠加)。
+ */
+export const MONOPHONIC_SLOTS: ReadonlySet<SlotId> = new Set<SlotId>(['menuMove'])
+export const MONOPHONIC_MIN_INTERVAL_MS = 50
+
+/** 交互音事件的最小间隔(ms):绕开槽位 200ms 去重,按事件各自计闸。 */
+export const INTERACTION_MIN_INTERVAL_MS = 50
+
 function defaultVisibility(): 'visible' | 'hidden' {
   return typeof document !== 'undefined' && document.visibilityState === 'hidden' ? 'hidden' : 'visible'
 }
@@ -127,6 +138,9 @@ export function createEngine(options: EngineOptions): Engine {
   let enabled = true
   let throttleMs = 200
   const lastPlayedAt = new Map<SlotId, number>()
+  const activeSources = new Map<SlotId, SourceNodeLike>()
+  // 交互音事件闸:按事件 id 计时,不受 setThrottleMs 影响。
+  const lastInteractionAt = new Map<string, number>()
 
   function bufferKey(slotFile: SlotFile): string {
     return slotFile.pack ? `pack/${slotFile.file}` : slotFile.file
@@ -173,11 +187,22 @@ export function createEngine(options: EngineOptions): Engine {
       if (!mapping) return
       // 后台策略:hidden 仅介入级(SPEC §4 白名单)。
       if (visibility() === 'hidden' && mapping.level !== 'intervention') return
-      // 节流:同槽位在时间窗内去重(SPEC §4,默认 200ms)。闸后立即占位,
-      // 防止并发同槽事件在解码延迟窗口内双响。
-      const playedAt = lastPlayedAt.get(mapping.slot)
-      if (throttleMs > 0 && playedAt !== undefined && now() - playedAt < throttleMs) return
-      lastPlayedAt.set(mapping.slot, now())
+      // 节流(SPEC §4):默认按槽位 200ms 去重(setThrottleMs 可调),闸后立即
+      // 占位防并发同槽在解码窗内双响。两类例外:
+      //  - 单声道槽位(菜单移动音):固定 50ms 最小间隔替代 200ms 去重;
+      //  - 交互音事件:按事件 50ms 计闸 —— 确认槽与 tool/result 同槽,槽位
+      //    200ms 去重会吞掉快速连点面板时的重开确认音(实机踩坑)。
+      const monophonic = MONOPHONIC_SLOTS.has(mapping.slot)
+      if (INTERACTION_EVENT_IDS.has(eventId)) {
+        const lastAt = lastInteractionAt.get(eventId)
+        if (lastAt !== undefined && now() - lastAt < INTERACTION_MIN_INTERVAL_MS) return
+        lastInteractionAt.set(eventId, now())
+      } else {
+        const windowMs = monophonic ? MONOPHONIC_MIN_INTERVAL_MS : throttleMs
+        const playedAt = lastPlayedAt.get(mapping.slot)
+        if (windowMs > 0 && playedAt !== undefined && now() - playedAt < windowMs) return
+        lastPlayedAt.set(mapping.slot, now())
+      }
       const slotFile = slotFiles.get(mapping.slot)
       const slotGain = slotGains.get(mapping.slot)
       if (!slotFile || !slotGain) return
@@ -193,6 +218,18 @@ export function createEngine(options: EngineOptions): Engine {
         source.connect(shot)
       } else {
         source.connect(slotGain)
+      }
+      if (monophonic) {
+        // 单声道打断:上一响立刻停,防快速扫选时音效叠加糊掉。
+        const previous = activeSources.get(mapping.slot)
+        if (previous !== undefined) {
+          try {
+            previous.stop()
+          } catch {
+            // 已停止的节点再 stop 个别实现会抛;单声道语义下忽略。
+          }
+        }
+        activeSources.set(mapping.slot, source)
       }
       source.start()
     },

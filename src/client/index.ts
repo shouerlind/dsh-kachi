@@ -1,7 +1,7 @@
 /**
  * dsh-kachi 浏览器半入口:装配播放引擎、手势解锁(含 Notification 降级)、
- * journal 接线(B 层,含审批 asked 事件)、生命周期/连接接线(C 层)、
- * 设置页(SPEC §6 全部六项)。
+ * journal 接线(B 层,含审批 asked 事件)、生命周期/连接/交互音接线(C 层,
+ * 交互音为 document 级 DOM 委托,ADR-0001)、设置页(SPEC §6 全部六项)。
  */
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
@@ -14,6 +14,7 @@ import { createEngine } from './engine/audio-engine.ts'
 import { installUnlock } from './engine/unlock.ts'
 import { wireLayerB } from './wiring/layer-b.ts'
 import { wireLayerC } from './wiring/layer-c.ts'
+import { wireInteraction } from './wiring/interaction.ts'
 import { bindKachiSettings } from './settings/controller.ts'
 import { engineSettingsTarget } from './settings/bridge.ts'
 import { applyKachiSettings, shouldPlayBoot } from './settings/policy.ts'
@@ -65,6 +66,9 @@ export function apply(ctx: Context): void {
   ctx.effect(() => wireLayerB(ctx.sessions, engine), 'dsh-kachi: journal wiring')
 
   ctx.effect(() => wireLayerC(ctx.sessions, engine), 'dsh-kachi: lifecycle wiring')
+
+  // 交互音委托:composer 二级面板悬停/点击/关闭(ADR-0001)。
+  ctx.effect(() => wireInteraction(window.document, engine), 'dsh-kachi: interaction wiring')
 
   // 设置页两行(slots.inject 挂调用方 fiber,官方插件均为顶层调用)。
   const settingsUIDisposers = [

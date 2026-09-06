@@ -26,7 +26,9 @@ describe('槽位表', () => {
   it('默认槽位音量与 SPEC §5 一致(主事件档位)', () => {
     expect(DEFAULT_SLOT_VOLUMES.menuMove).toBe(40)
     expect(DEFAULT_SLOT_VOLUMES.button).toBe(30)
-    expect(DEFAULT_SLOT_VOLUMES.confirm).toBe(60)
+    // 确认/取消接近但保留取消略重(用户决议:不要差太大,也要有点差距)。
+    expect(DEFAULT_SLOT_VOLUMES.confirm).toBe(80)
+    expect(DEFAULT_SLOT_VOLUMES.cancel).toBe(90)
     expect(DEFAULT_SLOT_VOLUMES.warn).toBe(90)
     expect(DEFAULT_SLOT_VOLUMES.taskComplete).toBe(100)
     expect(DEFAULT_SLOT_VOLUMES.error).toBe(100)

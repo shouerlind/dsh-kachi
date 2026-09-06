@@ -4,6 +4,7 @@ export class FakeSource {
   buffer: AudioBuffer | null = null
   connectedTo: unknown = null
   started = 0
+  stopped = 0
   connect(node: unknown): this {
     this.connectedTo = node
     return this
@@ -11,7 +12,9 @@ export class FakeSource {
   start(): void {
     this.started++
   }
-  stop(): void {}
+  stop(): void {
+    this.stopped++
+  }
 }
 
 export class FakeGain {

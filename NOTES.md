@@ -71,3 +71,26 @@
 启动即崩:`duplicate loader entry id: dsh-kachi`。修复:顶层 patch 保持 `[]`,
 装载只走 bundle 层(与 dsh-cost-meter 等插件同构)。profile 改完可用
 `dsh --profile web --port 3081` 限时启动验证。
+
+## 踩坑:交互音委托的两个 DOM 时序/结构坑(2026-09-06,实机走查发现)
+
+1. **React 18 离散事件同步提交**:document **冒泡**阶段读触发器 `aria-expanded`
+   读到的已是翻转后的值(React root 的监听先于 document 冒泡跑完),开/关判定
+   会反。修复:click/mousedown 挂 **capture**,capture 阶段才是切换前状态。
+2. **范围锚选错层级**:`[data-composer-card]` 只圈输入卡片;权限预设/工作区
+   座席在卡片外的 hero 行(`wSkVaW_heroWorkspaceRow`),整组被排除成全静默。
+   修复:改用 `[data-composer-seat]`(实机走查全页恰一个,圈住卡片 + 全部座席行)。
+3. **portal 面板**:权限预设的共享 Menu(`createPortal` 到 body)不在座席子树
+   内,条目须按「触发器打开的会话」放宽范围,并在各关闭路径回收会话,防止
+   泄漏到设置页同名菜单。
+4. **确认槽 200ms 去重吞交互音**:确认音槽位与 tool/result 同槽,槽位级去重
+   会吞掉快速连点面板时的重开确认音(用户实测「开没声关有声」的最后一环)。
+   修复:交互音事件(menu-*)绕开槽位去重,引擎按事件各自 50ms 计闸。
+5. **共享 Menu 的点外关闭监听 pointerdown**(Menu.tsx),比 mousedown 先触发
+   并同步卸载面板;外部点击取消音必须在 capture pointerdown 里判定。
+6. **HMR 会在页面上叠监听器**:每次 `npm run build` 推送都是新一代 apply,
+   旧一代委托监听不被清理,多代并存会按各自版本的逻辑同时发声(实测一页
+   四代)。验证行为前必须先刷新页面,否则症状是「多代混合体」。
+7. **启动器只认自己启动的实例**:外部(脚本/会话)拉起的 dsh 占着 3080 时,
+   DSH 启动器显示「已停止」且点启动失败(抢不到端口),像「启动不了」。
+   会话里拉起的实例用完要停掉,把端口还给启动器。
