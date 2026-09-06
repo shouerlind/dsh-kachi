@@ -63,3 +63,11 @@
   工单 #9–#15 全部关闭,项目交付。
 - 日常开发注意:改代码后 `npm run build`(client.js 由 HMR 自动重载);改 host 半或 package.json
   才需经启动器重启 dsh。
+
+## 踩坑:duplicate loader entry(2026-09-06,启动失败根因)
+
+`dsh.profile.bundles` 里的包若自带 `dsh.bundle.patch`(cordis.patch.yml),bundle 层会
+自动应用它的 insert;**再手写进 profile 顶层 cordis.patch.yml 就是同一 id 插两次**,
+启动即崩:`duplicate loader entry id: dsh-kachi`。修复:顶层 patch 保持 `[]`,
+装载只走 bundle 层(与 dsh-cost-meter 等插件同构)。profile 改完可用
+`dsh --profile web --port 3081` 限时启动验证。
