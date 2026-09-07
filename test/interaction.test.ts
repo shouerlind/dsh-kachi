@@ -144,18 +144,13 @@ describe('选项点击与菜单差分(SPEC §5.1 锚点段;#26 下沉状态机)'
     expect(played).toEqual(['menu-item-click'])
   })
 
-  it('菜单差分:挂载=开音且面板净在;卸载=取消音;恒无=静默', () => {
+  it('菜单差分:挂载=开音,卸载=取消音,恒无=静默,都在(换面板开)=开音', () => {
     const { sound, played } = make()
-    expect(sound.menuDiff(false, true)).toBe(true)
-    expect(sound.menuDiff(true, false)).toBe(false)
-    expect(sound.menuDiff(false, false)).toBe(false)
-    expect(played).toEqual(['menu-open', 'menu-close'])
-  })
-
-  it('菜单差分:都在(换面板开)= 开音', () => {
-    const { sound, played } = make()
-    expect(sound.menuDiff(true, true)).toBe(true)
-    expect(played).toEqual(['menu-open'])
+    sound.menuDiff(false, true)
+    sound.menuDiff(true, false)
+    sound.menuDiff(false, false)
+    sound.menuDiff(true, true)
+    expect(played).toEqual(['menu-open', 'menu-close', 'menu-open'])
   })
 })
 

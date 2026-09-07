@@ -1,31 +1,30 @@
 /**
- * C 层交互音接线(SPEC §5.1,ADR-0001):document 级原生事件委托,覆盖 dsh
- * 自家 UI 的 composer 二级面板 —— 悬停/键盘移动=菜单移动音,触发器打开与
- * 选项点击=确认音,未选中关闭=取消音。锚点全是语义属性(aria/role;类名
- * 是 CSS module 运行时哈希不可用),范围锚 [data-composer-seat]。
+ * C 层交互音接线(SPEC §5.1,ADR-0001;工单 #20 全局推广):document 级
+ * 原生事件委托,全站覆盖 dsh 自家 UI 的二级面板 —— 悬停/键盘移动=菜单移动
+ * 音,触发器打开与选项点击=确认音,未选中关闭=取消音。锚点全是语义属性
+ * (aria/role;类名是 CSS module 运行时哈希不可用)。
  * 发声决策(触发器开关、悬停/焦点去重、按压伴随 focus 静默、菜单差分分类)
  * 收在 createInteractionSound 纯状态机(时钟注入,无 DOM 可测);DOM 胶水
- * 只做 target → closest 翻译、面板存活读数、会话(范围)记账与计时器,
- * 引擎发声只经状态机的 play 回调。
+ * 只做 target → closest 翻译、面板存活读数与计时器,引擎发声只经状态机
+ * 的 play 回调。
  */
 import type { Engine } from '../engine/audio-engine.ts'
 
-/** 触发器(dsh 三件套与全部 composer 菜单按钮的稳定语义标记)。 */
-export const TRIGGER_SELECTOR = '[aria-haspopup="menu"]'
+/** 触发器(全站带 aria 标记的菜单按钮;dsh 实测取值 menu 与 listbox —— composer 命令菜单 + 钮即 listbox)。 */
+export const TRIGGER_SELECTOR = '[aria-haspopup="menu"],[aria-haspopup="listbox"]'
 /** 面板容器:ModelSelect 手写 role="menu",共享 MenuView 用 role="listbox"。 */
 export const MENU_SELECTOR = '[role="menu"],[role="listbox"]'
 /** 面板条目(ModelSelect 的 menuitem/menuitemradio 与 MenuView 的 option)。 */
 export const ITEM_SELECTOR = '[role="menuitem"],[role="menuitemradio"],[role="option"]'
-/** seat 内候选按钮(命令胶囊等无 aria 标记的菜单触发器走菜单差分判定)。 */
+/** 候选按钮(菜单差分兜底的扫描面;仅座席内启用,见 SEAT_SELECTOR 注)。 */
 export const BUTTON_SELECTOR = 'button,[role="button"]'
 /** 菜单差分判定等待渲染落定的窗口(ms;React 离散事件同步提交,一帧内可见)。 */
 export const MENU_DIFF_DELAY_MS = 50
-/** 条目点击后回收陈旧会话的延迟(ms):须晚于 portal 卸载落定,大于差分窗留余量。 */
-const MENU_GC_DELAY_MS = 120
 /**
- * 范围锚:composer 座席容器(ADR-0001 首期边界;全局推广见工单 #20)。
- * 踩坑:[data-composer-card] 只圈住输入卡片,权限预设/工作区座席在卡片外的
- * hero 行 —— 座席容器才圈住全部三件套(实机 DOM 走查确认,全页恰一个)。
+ * 差分兜底的范围锚:composer 座席容器(全局推广后唯一保留的座席约束)。
+ * dsh 全站菜单触发器均带 aria 标记(实测 0.1.2:设置页菜单行/上下文量表/
+ * 语言行/空屏座席),无标记的命令胶囊只在 composer —— 兜底不随 #20 放宽,
+ * 座席外出现静默菜单时再议。
  */
 export const SEAT_SELECTOR = '[data-composer-seat]'
 
@@ -54,8 +53,7 @@ export interface InteractionDeps {
  *    其后伴随按压的 focus 静默(点击自有确认音,防双响,#28)。
  *  - itemClick():选项点击 = 确认音;无状态直报,统一经状态机发声。
  *  - menuDiff(before, after):无标记座席按钮的菜单差分分类(SPEC §5.1
- *    锚点段)——挂载/换面板开 = 确认音,卸载 = 取消音,恒无 = 静默;
- *    返回面板净在布尔,胶水只按它记会话。
+ *    锚点段)——挂载/换面板开 = 确认音,卸载 = 取消音,恒无 = 静默。
  *  - pressOutside:面板在 DOM 且按点不在触发器/面板内 → 未选中关闭。
  *  - escape:面板在 DOM 即取消音(钻入态 Escape 退层同属返回语义)。
  */
@@ -122,13 +120,9 @@ export function createInteractionSound(deps: InteractionDeps) {
       deps.play('menu-item-click')
     },
 
-    menuDiff(before: boolean, after: boolean): boolean {
-      if (after) {
-        deps.play('menu-open')
-        return true
-      }
-      if (before) deps.play('menu-close')
-      return false
+    menuDiff(before: boolean, after: boolean): void {
+      if (after) deps.play('menu-open')
+      else if (before) deps.play('menu-close')
     },
   }
 }
@@ -140,9 +134,8 @@ export function createInteractionSound(deps: InteractionDeps) {
  * 两个实机约束(踩坑记录):
  *  - click/pointerdown 挂 capture:React 18 对离散事件同步提交,document 冒泡
  *    阶段读 aria-expanded 已是翻转后的值;capture 阶段才是切换前状态。
- *  - portal 面板(共享 Menu,createPortal 到 body)不在 composer 座席子树内,
- *    条目范围放宽为「座席内 OR 会话进行中」;会话由 composer 触发器打开,
- *    随各类关闭路径显式回收,防止范围泄漏到设置页等同名菜单。
+ *  - 面板存活要求可见:第三方/插件 UI 可能常驻挂载隐藏菜单,只按挂载判定
+ *    会让 Escape/点外路径凭空响取消音(checkVisibility 守卫,缺 API 退回挂载)。
  */
 export function wireInteraction(doc: Document, engine: Pick<Engine, 'play'>): () => void {
   const sound = createInteractionSound({
@@ -152,84 +145,51 @@ export function wireInteraction(doc: Document, engine: Pick<Engine, 'play'>): ()
     now: () => performance.now(),
   })
 
-  /** 会话:composer 触发器打开中的菜单(布尔;菜单消失的各条路径都会清掉)。 */
-  let sessionOpen = false
-  let menuGcTimer: ReturnType<typeof setTimeout> | undefined
-  let diffTimer: ReturnType<typeof setTimeout> | undefined
-
   const asElement = (target: EventTarget | null): Element | null =>
     target instanceof Element ? target : null
 
+  /** 座席内元素(仅差分兜底与其点外豁免使用,见 SEAT_SELECTOR 注)。 */
   const inSeat = (el: Element | null): Element | null =>
     el !== null && el.closest(SEAT_SELECTOR) !== null ? el : null
 
-  /** 范围判定:座席内元素恒在范围;座席外条目仅在会话进行中(其触发器在座席内)。 */
-  const inScope = (el: Element | null): Element | null =>
-    el !== null && (sessionOpen || el.closest(SEAT_SELECTOR) !== null) ? el : null
+  /** 面板存活读数(全站;须可见,见头注)。 */
+  const menuAlive = (): boolean =>
+    [...doc.querySelectorAll(MENU_SELECTOR)].some((menu) => menu.checkVisibility?.() ?? true)
 
-  const anyMenuAlive = (): boolean => doc.querySelector(MENU_SELECTOR) !== null
-
-  const seatMenuAlive = (): boolean =>
-    doc.querySelector(`${SEAT_SELECTOR} :is(${MENU_SELECTOR})`) !== null
-
-  /** composer 自有菜单:座席内面板恒算;portal 面板仅会话进行中算。 */
-  const composerMenuAlive = (): boolean => seatMenuAlive() || (sessionOpen && anyMenuAlive())
-
-  /** 菜单已消亡则回收会话(陈旧 portal 会话不得继续放宽条目范围)。 */
-  const gcSessionIfMenuDead = (): void => {
-    if (sessionOpen && !anyMenuAlive()) sessionOpen = false
-  }
-
-  /**
-   * 条目点击后面板可能已卸载(portal onSelect 关闭);延迟一个渲染余量后
-   * 回收陈旧会话(须晚于差分判定窗,portal 卸载才落定)。
-   */
-  const armMenuGc = (): void => {
-    if (menuGcTimer !== undefined) clearTimeout(menuGcTimer)
-    menuGcTimer = setTimeout(() => {
-      menuGcTimer = undefined
-      gcSessionIfMenuDead()
-    }, MENU_GC_DELAY_MS)
-  }
+  let diffTimer: ReturnType<typeof setTimeout> | undefined
 
   /**
    * 无 aria 标记的座席按钮(如 /permission 命令胶囊)没法从属性判断开/关,
    * 按菜单出现差分分类:点击前后面板有无,声随渲染落定,至多差一个判定窗。
-   * 分类决策在状态机(menuDiff),这里只读存活、记账会话。
+   * 分类决策在状态机(menuDiff),这里只读存活。
    */
   const scheduleMenuDiff = (): void => {
-    const before = composerMenuAlive()
+    const before = menuAlive()
     if (diffTimer !== undefined) clearTimeout(diffTimer)
     diffTimer = setTimeout(() => {
       diffTimer = undefined
-      if (sound.menuDiff(before, composerMenuAlive())) sessionOpen = true
-      else if (before) sessionOpen = false
+      sound.menuDiff(before, menuAlive())
     }, MENU_DIFF_DELAY_MS)
   }
 
   const onClick = (e: MouseEvent): void => {
     const target = asElement(e.target)
     if (target === null) return
-    if (inScope(target.closest(ITEM_SELECTOR)) !== null) {
+    if (target.closest(ITEM_SELECTOR) !== null) {
       // 选项点击恒为确认(已选中项的关闭性点击同属确认按压,SPEC §5.1)。
       sound.itemClick()
-      armMenuGc()
       return
     }
-    const trigger = inSeat(target.closest(TRIGGER_SELECTOR))
+    const trigger = target.closest(TRIGGER_SELECTOR)
     if (trigger !== null) {
       const expandedBefore = trigger.getAttribute('aria-expanded') === 'true'
       sound.menuOpen(expandedBefore)
-      sessionOpen = !expandedBefore
       return
     }
     if (inSeat(target.closest(BUTTON_SELECTOR)) !== null) {
       // 无 aria 标记的座席按钮(/permission 命令胶囊等):开/关交给菜单差分。
       scheduleMenuDiff()
-      return
     }
-    // 其余点击(含键盘 Enter 触发的无 mousedown 点击):面板若已不在,回收会话。
-    gcSessionIfMenuDead()
   }
 
   /**
@@ -241,36 +201,30 @@ export function wireInteraction(doc: Document, engine: Pick<Engine, 'play'>): ()
     const target = asElement(e.target)
     if (target === null) return
     const location = {
-      // 座席内按钮(含无标记胶囊)的开关由菜单差分发声,点外取消音豁免它们防双响。
-      onTrigger: inSeat(target.closest(TRIGGER_SELECTOR)) !== null ||
+      // 座席内无标记按钮(含胶囊)的开关由菜单差分发声,点外取消音豁免它们防双响。
+      onTrigger: target.closest(TRIGGER_SELECTOR) !== null ||
                  inSeat(target.closest(BUTTON_SELECTOR)) !== null,
-      insideMenu: inScope(target.closest(MENU_SELECTOR)) !== null,
+      insideMenu: target.closest(MENU_SELECTOR) !== null,
     }
-    const menuAlive = composerMenuAlive()
-    sound.pressItem(inScope(target.closest(ITEM_SELECTOR)))
-    sound.pressOutside(location, menuAlive)
-    if (menuAlive && !location.onTrigger && !location.insideMenu) sessionOpen = false
-    gcSessionIfMenuDead()
+    sound.pressItem(target.closest(ITEM_SELECTOR))
+    sound.pressOutside(location, menuAlive())
   }
 
   const onHover = (e: MouseEvent): void => {
     const target = asElement(e.target)
     if (target === null) return
-    sound.itemHover(inScope(target.closest(ITEM_SELECTOR)))
+    sound.itemHover(target.closest(ITEM_SELECTOR))
   }
 
   const onFocus = (e: FocusEvent): void => {
     const target = asElement(e.target)
     if (target === null) return
-    const item = inScope(target.closest(ITEM_SELECTOR))
-    if (item !== null) sound.itemFocus(item)
+    sound.itemFocus(target.closest(ITEM_SELECTOR))
   }
 
   const onKey = (e: KeyboardEvent): void => {
     if (e.key !== 'Escape') return
-    const menuAlive = composerMenuAlive()
-    sound.escape(menuAlive)
-    if (menuAlive) sessionOpen = false
+    sound.escape(menuAlive())
   }
 
   doc.addEventListener('click', onClick, { capture: true, passive: true })
@@ -284,7 +238,6 @@ export function wireInteraction(doc: Document, engine: Pick<Engine, 'play'>): ()
     doc.removeEventListener('mouseover', onHover)
     doc.removeEventListener('focusin', onFocus)
     doc.removeEventListener('keydown', onKey)
-    if (menuGcTimer !== undefined) clearTimeout(menuGcTimer)
     if (diffTimer !== undefined) clearTimeout(diffTimer)
   }
 }
