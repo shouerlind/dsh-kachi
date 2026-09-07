@@ -51,8 +51,8 @@ export const DEFAULT_SLOT_VOLUMES: Record<SlotId, number> = {
   menuMove: 40,
   send: 100,
   button: 30,
-  confirm: 60,
-  cancel: 100,
+  confirm: 80,
+  cancel: 90,
   sessionNew: 100,
   sessionClose: 100,
   reconnect: 100,
@@ -83,6 +83,10 @@ export const EVENT_IDS = [
   'reconnecting',
   'reconnected',
   'own-click',
+  'menu-open',
+  'menu-move',
+  'menu-item-click',
+  'menu-close',
 ] as const
 
 export type EventId = (typeof EVENT_IDS)[number]
@@ -108,6 +112,13 @@ export const EVENT_SOUNDS: Record<EventId, { slot: SlotId; level: Level; volume:
   reconnecting: { slot: 'warn', level: 'foreground', volume: 100 },
   reconnected: { slot: 'reconnect', level: 'foreground', volume: 100 },
   'own-click': { slot: 'button', level: 'foreground', volume: 100 },
+  // composer 交互音(SPEC §5 行 21-24):volume 全 100,档位由槽位默认音量
+  // 承接(confirm@80 / menuMove@40 / cancel@90;确认与取消刻意接近但保留
+  // 取消略重 —— 用户决议「不要差太大,也要有点差距」)。
+  'menu-open': { slot: 'confirm', level: 'foreground', volume: 100 },
+  'menu-move': { slot: 'menuMove', level: 'foreground', volume: 100 },
+  'menu-item-click': { slot: 'confirm', level: 'foreground', volume: 100 },
+  'menu-close': { slot: 'cancel', level: 'foreground', volume: 100 },
 }
 
 /**
@@ -146,6 +157,18 @@ export const SLOT_LABELS: Record<SlotId, string> = {
   reconnect: '恢复音',
   warn: '警示音',
 }
+
+/**
+ * 交互音事件(SPEC §5 行 21-24):绕开槽位 200ms 去重(那是给工具调用高频
+ * 事件设计的,会吞掉快速连点面板的重开确认音),引擎按事件 50ms 最小间隔
+ * 放行。菜单移动音另享单声道打断(引擎 MONOPHONIC_SLOTS)。
+ */
+export const INTERACTION_EVENT_IDS: ReadonlySet<EventId> = new Set<EventId>([
+  'menu-open',
+  'menu-move',
+  'menu-item-click',
+  'menu-close',
+])
 
 /** 是否 13 个默认槽位文件之一(根目录);否则视为 pack 池内文件。 */
 export function isDefaultSound(file: string): boolean {
