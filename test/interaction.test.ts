@@ -137,6 +137,28 @@ describe('按压伴随 focus 静默(#28:抑制悬停项点击双响)', () => {
   })
 })
 
+describe('选项点击与菜单差分(SPEC §5.1 锚点段;#26 下沉状态机)', () => {
+  it('选项点击 = 确认音直报', () => {
+    const { sound, played } = make()
+    sound.itemClick()
+    expect(played).toEqual(['menu-item-click'])
+  })
+
+  it('菜单差分:挂载=开音且面板净在;卸载=取消音;恒无=静默', () => {
+    const { sound, played } = make()
+    expect(sound.menuDiff(false, true)).toBe(true)
+    expect(sound.menuDiff(true, false)).toBe(false)
+    expect(sound.menuDiff(false, false)).toBe(false)
+    expect(played).toEqual(['menu-open', 'menu-close'])
+  })
+
+  it('菜单差分:都在(换面板开)= 开音', () => {
+    const { sound, played } = make()
+    expect(sound.menuDiff(true, true)).toBe(true)
+    expect(played).toEqual(['menu-open'])
+  })
+})
+
 describe('未选中关闭(SPEC §5.1)', () => {
   it('面板在 DOM 且按点不在触发器/面板内 → 取消音', () => {
     const { sound, played } = make()
