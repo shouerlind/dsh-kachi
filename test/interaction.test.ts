@@ -102,6 +102,41 @@ describe('键盘同权(SPEC §5.1:focus 委托)', () => {
   })
 })
 
+describe('按压伴随 focus 静默(#28:抑制悬停项点击双响)', () => {
+  it('打开瞬间被抑制悬停的选项,按压+focus 静默,只保留开音(确认音由 click 路径发声)', () => {
+    const { sound, played, at } = make()
+    sound.menuOpen(false)
+    at(50)
+    sound.itemHover('a') // 被抑制:无声
+    sound.pressItem('a') // pointerdown 落在该选项
+    sound.itemFocus('a') // 按压伴随的 focusin → 静默
+    expect(played).toEqual(['menu-open'])
+  })
+
+  it('按压记录消费后不残留:其后的键盘 focus 照常响', () => {
+    const { sound, played } = make()
+    sound.pressItem('a')
+    sound.itemFocus('a') // 消费
+    sound.itemFocus('b') // 键盘移动 → 响
+    expect(played).toEqual(['menu-move'])
+  })
+
+  it('pointerdown 不在选项上不拦键盘 focus', () => {
+    const { sound, played } = make()
+    sound.pressItem(null)
+    sound.itemFocus('a')
+    expect(played).toEqual(['menu-move'])
+  })
+
+  it('面板重开清按压记录:上一会话的按压不拦新面板的 focus', () => {
+    const { sound, played } = make()
+    sound.pressItem('a')
+    sound.menuOpen(false)
+    sound.itemFocus('a')
+    expect(played).toEqual(['menu-open', 'menu-move'])
+  })
+})
+
 describe('未选中关闭(SPEC §5.1)', () => {
   it('面板在 DOM 且按点不在触发器/面板内 → 取消音', () => {
     const { sound, played } = make()

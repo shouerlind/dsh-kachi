@@ -46,6 +46,8 @@ export interface InteractionDeps {
  *  - itemFocus(item):focusin 委托,与悬停共用「最近发声目标」去重 —— 点击
  *    聚焦回悬停已响过的同一项不双响;键盘移动不受打开抑制窗限制(那是
  *    指针静止在面板上的问题,十字键语义每一格都该响)。
+ *  - pressItem(item):pointerdown 委托翻好的选项(null = 落点不在选项上);
+ *    其后伴随按压的 focus 静默(点击自有确认音,防双响,#28)。
  *  - pressOutside:面板在 DOM 且按点不在触发器/面板内 → 未选中关闭。
  *  - escape:面板在 DOM 即取消音(钻入态 Escape 退层同属返回语义)。
  */
@@ -53,6 +55,7 @@ export function createInteractionSound(deps: InteractionDeps) {
   let openedAt = Number.NEGATIVE_INFINITY
   let lastEntered: unknown = null
   let lastMoved: unknown = null
+  let pressedItem: unknown = null
 
   function moveSound(target: unknown): void {
     if (target === lastMoved) return
@@ -69,6 +72,7 @@ export function createInteractionSound(deps: InteractionDeps) {
       openedAt = deps.now()
       lastEntered = null
       lastMoved = null
+      pressedItem = null
       deps.play('menu-open')
     },
 
@@ -84,7 +88,16 @@ export function createInteractionSound(deps: InteractionDeps) {
       moveSound(item)
     },
 
+    pressItem(item: unknown | null): void {
+      pressedItem = item
+    },
+
     itemFocus(item: unknown): void {
+      // 按压伴随的 focus(mousedown 聚焦)静默:该次点击自带确认音。
+      if (item !== null && item === pressedItem) {
+        pressedItem = null
+        return
+      }
       moveSound(item)
     },
 
@@ -223,6 +236,7 @@ export function wireInteraction(doc: Document, engine: Pick<Engine, 'play'>): ()
       insideMenu: inScope(target.closest(MENU_SELECTOR)) !== null,
     }
     const menuAlive = composerMenuAlive()
+    sound.pressItem(inScope(target.closest(ITEM_SELECTOR)))
     sound.pressOutside(location, menuAlive)
     if (menuAlive && !location.onTrigger && !location.insideMenu) session = null
     if (session !== null && !anyMenuAlive()) session = null
