@@ -37,10 +37,15 @@ describe('槽位表', () => {
 })
 
 describe('事件 → 音效映射(SPEC §5)', () => {
-  it('工具三音音量档位正确(30%/60%/70%)', () => {
-    expect(EVENT_SOUNDS['tool-call']).toMatchObject({ slot: 'button', volume: 30, level: 'foreground' })
-    expect(EVENT_SOUNDS['tool-result-ok']).toMatchObject({ slot: 'confirm', volume: 60, level: 'foreground' })
+  it('工具三音档位:主档由槽位承载,行级微降走事件系数(单一承载层)', () => {
+    // tool-call 30% / tool-result-ok 80%:槽位主档已承载,事件系数恒 100;
+    // tool-result-fail 70%:error 槽主档 100,行级低于主档走事件系数微降。
+    expect(EVENT_SOUNDS['tool-call']).toMatchObject({ slot: 'button', volume: 100, level: 'foreground' })
+    expect(DEFAULT_SLOT_VOLUMES.button).toBe(30)
+    expect(EVENT_SOUNDS['tool-result-ok']).toMatchObject({ slot: 'confirm', volume: 100, level: 'foreground' })
+    expect(DEFAULT_SLOT_VOLUMES.confirm).toBe(80)
     expect(EVENT_SOUNDS['tool-result-fail']).toMatchObject({ slot: 'error', volume: 70, level: 'foreground' })
+    expect(DEFAULT_SLOT_VOLUMES.error).toBe(100)
   })
 
   it('介入级白名单 = 全部介入级事件:审批请求、agent 提问、回合错误(回合/会话/作业)、任务完成', () => {

@@ -42,7 +42,7 @@ export const DEFAULT_SLOT_SOUNDS: Record<SlotId, string> = {
   warn: 'warn.wav',
 }
 
-/** 各槽位默认音量(SPEC §5 音量列;一槽多事件时取主事件档位)。 */
+/** 各槽位默认音量:SPEC §5 音量列的槽位主档位(唯一承载层;行级低于主档由事件 volume 微降)。 */
 export const DEFAULT_SLOT_VOLUMES: Record<SlotId, number> = {
   boot: 100,
   notifyImportant: 100,
@@ -91,7 +91,13 @@ export const EVENT_IDS = [
 
 export type EventId = (typeof EVENT_IDS)[number]
 
-/** 事件 → 槽位/分级/事件音量(同一文件按事件以不同音量复用,音量变体不另建文件)。 */
+/**
+ * 事件 → 槽位/分级/事件音量。音量承载约定(单一承载层):
+ * 槽位默认音量承载 SPEC §5 音量列的槽位主档位;事件 volume 仅作
+ * 「同槽低于主档」的线性微降(如 tool-result-fail 70 / jobs-completed 60),
+ * 与主档一致时恒为 100,不得与槽位叠乘。
+ * 同一文件按事件以不同音量复用,音量变体不另建文件。
+ */
 export const EVENT_SOUNDS: Record<EventId, { slot: SlotId; level: Level; volume: number }> = {
   boot: { slot: 'boot', level: 'foreground', volume: 100 },
   'approval-request': { slot: 'notifyImportant', level: 'intervention', volume: 100 },
@@ -101,8 +107,8 @@ export const EVENT_SOUNDS: Record<EventId, { slot: SlotId; level: Level; volume:
   'turn-end-completed': { slot: 'taskComplete', level: 'intervention', volume: 100 },
   'turn-end-error': { slot: 'error', level: 'intervention', volume: 100 },
   'turn-end-cancelled': { slot: 'cancel', level: 'foreground', volume: 100 },
-  'tool-call': { slot: 'button', level: 'foreground', volume: 30 },
-  'tool-result-ok': { slot: 'confirm', level: 'foreground', volume: 60 },
+  'tool-call': { slot: 'button', level: 'foreground', volume: 100 },
+  'tool-result-ok': { slot: 'confirm', level: 'foreground', volume: 100 },
   'tool-result-fail': { slot: 'error', level: 'foreground', volume: 70 },
   'session-added': { slot: 'sessionNew', level: 'foreground', volume: 100 },
   'session-removed': { slot: 'sessionClose', level: 'foreground', volume: 100 },

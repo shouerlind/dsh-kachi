@@ -211,7 +211,8 @@ export function createEngine(options: EngineOptions): Engine {
       if (buffer === undefined || closed || ctx.state !== 'running') return
       const source = ctx.createBufferSource()
       source.buffer = buffer
-      // 事件音量系数(SPEC §5 音量列,线性;槽位/总音量已平方映射)。
+      // 事件音量系数:同槽低于主档时的线性微降(槽位承载 SPEC §5 主档,
+      // 平方映射;恒 100 时不接入)。
       if (mapping.volume < 100) {
         const shot = ctx.createGain()
         shot.gain.value = mapping.volume / 100

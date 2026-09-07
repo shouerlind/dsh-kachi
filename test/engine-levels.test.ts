@@ -35,11 +35,21 @@ describe('引擎完整化:两级 GainNode 总线(工单 #10)', () => {
     const engine = makeEngine(ctx)
     await engine.unlock()
     engine.setSlotVolume('button', 30)
-    await engine.play('tool-call')
-    const shot = ctx.sources[0]!.connectedTo as FakeGain
-    expect(shot.gain.value).toBeCloseTo(0.3) // 事件系数 30%
-    const slotGain = shot.connectedTo as FakeGain
+    await engine.play('tool-call') // 事件系数 100(单一承载层):源直连槽位
+    const slotGain = ctx.sources[0]!.connectedTo as FakeGain
     expect(slotGain.gain.value).toBeCloseTo(0.09)
+    engine.dispose()
+  })
+
+  it('事件系数微降(同槽低于主档)挂 shot 增益:tool-result-fail 70% → 0.7', async () => {
+    const ctx = new FakeAudioContext()
+    const engine = makeEngine(ctx)
+    await engine.unlock()
+    await engine.play('tool-result-fail')
+    const shot = ctx.sources[0]!.connectedTo as FakeGain
+    expect(shot.gain.value).toBeCloseTo(0.7)
+    const slotGain = shot.connectedTo as FakeGain
+    expect(slotGain.gain.value).toBeCloseTo(1) // error 槽主档 100
     engine.dispose()
   })
 
