@@ -90,8 +90,9 @@ export function volumeGain(percent: number): number {
 }
 
 /**
- * 单声道槽位(SPEC §4 节流例外):悬停扫选/键盘移动是合法高频连响,
- * 不套 200ms 去重,改用固定 50ms 最小间隔,且新响立即打断上一响(不叠加)。
+ * 单声道槽位(SPEC §4 节流例外①,按槽位授权):menuMove 槽内全部事件
+ * (菜单移动音、借用该槽位的回合开始音)不套 200ms 去重,改用固定 50ms
+ * 最小间隔,且新响立即打断上一响(不叠加)。
  */
 export const MONOPHONIC_SLOTS: ReadonlySet<SlotId> = new Set<SlotId>(['menuMove'])
 export const MONOPHONIC_MIN_INTERVAL_MS = 50
