@@ -8,6 +8,9 @@ import {
   DEFAULT_SLOT_VOLUMES,
   EVENT_SOUNDS,
   INTERACTION_EVENT_IDS,
+  INTERACTION_MIN_INTERVAL_MS,
+  MONOPHONIC_MIN_INTERVAL_MS,
+  MONOPHONIC_SLOTS,
   SLOT_IDS,
   soundUrl,
   type SlotId,
@@ -88,17 +91,6 @@ export function volumeGain(percent: number): number {
   const v = Math.min(100, Math.max(0, percent)) / 100
   return v * v
 }
-
-/**
- * 单声道槽位(SPEC §4 节流例外①,按槽位授权):menuMove 槽内全部事件
- * (菜单移动音、借用该槽位的回合开始音)不套 200ms 去重,改用固定 50ms
- * 最小间隔,且新响立即打断上一响(不叠加)。
- */
-export const MONOPHONIC_SLOTS: ReadonlySet<SlotId> = new Set<SlotId>(['menuMove'])
-export const MONOPHONIC_MIN_INTERVAL_MS = 50
-
-/** 交互音事件的最小间隔(ms):绕开槽位 200ms 去重,按事件各自计闸。 */
-export const INTERACTION_MIN_INTERVAL_MS = 50
 
 function defaultVisibility(): 'visible' | 'hidden' {
   return typeof document !== 'undefined' && document.visibilityState === 'hidden' ? 'hidden' : 'visible'

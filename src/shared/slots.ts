@@ -167,7 +167,7 @@ export const SLOT_LABELS: Record<SlotId, string> = {
 /**
  * 交互音事件(SPEC §5 行 21-24):绕开槽位 200ms 去重(那是给工具调用高频
  * 事件设计的,会吞掉快速连点面板的重开确认音),引擎按事件 50ms 最小间隔
- * 放行。菜单移动音另享单声道打断(引擎 MONOPHONIC_SLOTS)。
+ * 放行。菜单移动音另享单声道打断(下方 MONOPHONIC_SLOTS)。
  */
 export const INTERACTION_EVENT_IDS: ReadonlySet<EventId> = new Set<EventId>([
   'menu-open',
@@ -175,6 +175,17 @@ export const INTERACTION_EVENT_IDS: ReadonlySet<EventId> = new Set<EventId>([
   'menu-item-click',
   'menu-close',
 ])
+
+/**
+ * 单声道槽位(SPEC §4 节流例外①,按槽位授权):menuMove 槽内全部事件
+ * (菜单移动音、借用该槽位的回合开始音)不套 200ms 去重,改用固定 50ms
+ * 最小间隔,且新响立即打断上一响(不叠加)。
+ */
+export const MONOPHONIC_SLOTS: ReadonlySet<SlotId> = new Set<SlotId>(['menuMove'])
+export const MONOPHONIC_MIN_INTERVAL_MS = 50
+
+/** 交互音事件的最小间隔(ms):绕开槽位 200ms 去重,按事件各自计闸。 */
+export const INTERACTION_MIN_INTERVAL_MS = 50
 
 /** 是否 13 个默认槽位文件之一(根目录);否则视为 pack 池内文件。 */
 export function isDefaultSound(file: string): boolean {
