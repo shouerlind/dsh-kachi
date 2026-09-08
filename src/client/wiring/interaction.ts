@@ -1,12 +1,16 @@
 /**
- * C 层交互音接线(SPEC §5.1,ADR-0001;工单 #20 全局推广):document 级
- * 原生事件委托,全站覆盖 dsh 自家 UI 的二级面板 —— 悬停/键盘移动=菜单移动
- * 音,触发器打开与选项点击=确认音,未选中关闭=取消音。锚点全是语义属性
- * (aria/role;类名是 CSS module 运行时哈希不可用)。
- * 发声决策(触发器开关、悬停/焦点去重、按压伴随 focus 静默、菜单差分分类)
- * 收在 createInteractionSound 纯状态机(时钟注入,无 DOM 可测);DOM 胶水
- * 只做 target → closest 翻译、面板存活读数与计时器,引擎发声只经状态机
- * 的 play 回调。
+ * C 层交互音接线(SPEC §5.1,ADR-0001;工单 #20 全局推广;2026-09-08 全站
+ * 按钮泛化):document 级原生事件委托。两条发声面 ——
+ *  - 二级面板:悬停/键盘移动=菜单移动音,触发器打开与选项点击=确认音,
+ *    未选中关闭=取消音(锚点全是语义属性 aria/role;类名是 CSS module
+ *    运行时哈希不可用);
+ *  - 全站泛化按钮:点击=按键音(ui-click),悬停/键盘焦点=菜单移动音
+ *    (ui-hover),面板内、自家设置行、座席按钮除外(各自路径权威);
+ *    面板在场时按到外部按钮只响取消音,当次 ui-click 抑制。
+ * 发声决策(触发器开关、悬停/焦点去重、按压伴随 focus 静默、菜单差分分类、
+ * 点外抑制)收在 createInteractionSound 纯状态机(时钟注入,无 DOM 可测);
+ * DOM 胶水只做 target → closest 翻译、面板存活读数与计时器,引擎发声只经
+ * 状态机的 play 回调。
  */
 import type { Engine } from '../engine/audio-engine.ts'
 
@@ -16,7 +20,8 @@ export const TRIGGER_SELECTOR = '[aria-haspopup="menu"],[aria-haspopup="listbox"
 export const MENU_SELECTOR = '[role="menu"],[role="listbox"]'
 /** 面板条目(ModelSelect 的 menuitem/menuitemradio 与 MenuView 的 option)。 */
 export const ITEM_SELECTOR = '[role="menuitem"],[role="menuitemradio"],[role="option"]'
-/** 候选按钮(菜单差分兜底的扫描面;仅座席内启用,见 SEAT_SELECTOR 注)。 */
+/** 候选按钮:菜单差分兜底的扫描面(仅座席内启用,见 SEAT_SELECTOR 注)+
+ * 全站泛化(2026-09-08)的点击/悬停/焦点锚。 */
 export const BUTTON_SELECTOR = 'button,[role="button"]'
 /** 菜单差分判定等待渲染落定的窗口(ms;React 离散事件同步提交,一帧内可见)。 */
 export const MENU_DIFF_DELAY_MS = 50
@@ -28,10 +33,22 @@ export const MENU_DIFF_DELAY_MS = 50
  */
 export const SEAT_SELECTOR = '[data-composer-seat]'
 
+/**
+ * 自家设置行容器(settings-ui.tsx,own-click 已接线 §5 行 18):泛化路径
+ * 跳过整行防双响。类名是自家样式表,非 CSS module 运行时哈希,可用。
+ */
+export const OWN_ROW_SELECTOR = '.kachi-row'
+
 /** 面板打开后抑制首次悬停音的窗口(ms),防与确认音叠(SPEC §5.1)。 */
 export const OPEN_SUPPRESS_MS = 150
 
-export type InteractionEvent = 'menu-open' | 'menu-move' | 'menu-item-click' | 'menu-close'
+export type InteractionEvent =
+  | 'menu-open'
+  | 'menu-move'
+  | 'menu-item-click'
+  | 'menu-close'
+  | 'ui-click'
+  | 'ui-hover'
 
 export interface InteractionDeps {
   play(event: InteractionEvent): void
@@ -54,19 +71,34 @@ export interface InteractionDeps {
  *  - itemClick():选项点击 = 确认音;无状态直报,统一经状态机发声。
  *  - menuDiff(before, after):无标记座席按钮的菜单差分分类(SPEC §5.1
  *    锚点段)——挂载/换面板开 = 确认音,卸载 = 取消音,恒无 = 静默。
- *  - pressOutside:面板在 DOM 且按点不在触发器/面板内 → 未选中关闭。
+ *  - pressOutside:面板在 DOM 且按点不在触发器/面板内 → 未选中关闭;同一按压
+ *    的后续 uiClick 抑制(2026-09-08 决议:一次按压一声,取消音已代表该按压)。
  *  - escape:面板在 DOM 即取消音(钻入态 Escape 退层同属返回语义)。
+ *  - uiHover/uiFocus/uiClick/pressUi:全站按钮泛化(2026-09-08 决议)——
+ *    悬停与键盘焦点共用「最近发声目标」去重(键盘同权,镜像面板条目);
+ *    按压伴随 focus 静默(镜像 #28,防点击双响);面板重开重置按压记录。
  */
 export function createInteractionSound(deps: InteractionDeps) {
   let openedAt = Number.NEGATIVE_INFINITY
   let lastEntered: unknown = null
   let lastMoved: unknown = null
   let pressedItem: unknown = null
+  let lastUi: unknown = null
+  let pressedUi: unknown = null
+  let suppressUiClick = false
 
   function moveSound(target: unknown): void {
     if (target === lastMoved) return
     lastMoved = target
     deps.play('menu-move')
+  }
+
+  /** 泛化按钮的悬停/焦点共用发声:null = 离开按钮面,重进同一按钮可再响。 */
+  function uiMoveSound(target: unknown): void {
+    if (target === lastUi) return
+    lastUi = target
+    if (target === null) return
+    deps.play('ui-hover')
   }
 
   return {
@@ -79,6 +111,7 @@ export function createInteractionSound(deps: InteractionDeps) {
       lastEntered = null
       lastMoved = null
       pressedItem = null
+      pressedUi = null
       deps.play('menu-open')
     },
 
@@ -96,6 +129,8 @@ export function createInteractionSound(deps: InteractionDeps) {
 
     pressItem(item: unknown | null): void {
       pressedItem = item
+      // 每次按压的起点:清上一按压遗留的「点外取消抑制」(只覆盖当次按压)。
+      suppressUiClick = false
     },
 
     itemFocus(item: unknown): void {
@@ -109,6 +144,7 @@ export function createInteractionSound(deps: InteractionDeps) {
 
     pressOutside(location: { onTrigger: boolean; insideMenu: boolean }, menuInDom: boolean): void {
       if (!menuInDom || location.onTrigger || location.insideMenu) return
+      suppressUiClick = true
       deps.play('menu-close')
     },
 
@@ -123,6 +159,31 @@ export function createInteractionSound(deps: InteractionDeps) {
     menuDiff(before: boolean, after: boolean): void {
       if (after) deps.play('menu-open')
       else if (before) deps.play('menu-close')
+    },
+
+    pressUi(target: unknown | null): void {
+      pressedUi = target
+    },
+
+    uiHover(target: unknown): void {
+      uiMoveSound(target)
+    },
+
+    uiFocus(target: unknown): void {
+      // 按压伴随的 focus(mousedown 聚焦)静默:该次点击自带 ui-click(#28 同构)。
+      if (target !== null && target === pressedUi) {
+        pressedUi = null
+        return
+      }
+      uiMoveSound(target)
+    },
+
+    uiClick(): void {
+      if (suppressUiClick) {
+        suppressUiClick = false
+        return
+      }
+      deps.play('ui-click')
     },
   }
 }
@@ -151,6 +212,18 @@ export function wireInteraction(doc: Document, engine: Pick<Engine, 'play'>): ()
   /** 座席内元素(仅差分兜底与其点外豁免使用,见 SEAT_SELECTOR 注)。 */
   const inSeat = (el: Element | null): Element | null =>
     el !== null && el.closest(SEAT_SELECTOR) !== null ? el : null
+
+  /**
+   * 泛化目标(2026-09-08):面板条目/面板容器/自家设置行之外最近按钮,
+   * 悬停与点击共用此排除集(条目与菜单路径权威;own-click 权威在自家行);
+   * null = 不在泛化面(悬停/焦点路径兼作「离开按钮面」的重置信号)。
+   */
+  const genericButton = (target: Element): Element | null => {
+    const btn = target.closest(BUTTON_SELECTOR)
+    if (btn === null) return null
+    if (btn.closest(MENU_SELECTOR) !== null || btn.closest(OWN_ROW_SELECTOR) !== null) return null
+    return btn
+  }
 
   /** 面板存活读数(全站;须可见,见头注)。 */
   const menuAlive = (): boolean =>
@@ -189,6 +262,12 @@ export function wireInteraction(doc: Document, engine: Pick<Engine, 'play'>): ()
     if (inSeat(target.closest(BUTTON_SELECTOR)) !== null) {
       // 无 aria 标记的座席按钮(/permission 命令胶囊等):开/关交给菜单差分。
       scheduleMenuDiff()
+      return
+    }
+    if (genericButton(target) !== null) {
+      // 全站泛化按钮(侧边栏/设置导航/顶栏/对话框等):按键音;触发器、
+      // 座席、自家行已在上方分流,此处不含面板内与面板在场抑制由状态机裁决。
+      sound.uiClick()
     }
   }
 
@@ -207,19 +286,33 @@ export function wireInteraction(doc: Document, engine: Pick<Engine, 'play'>): ()
       insideMenu: target.closest(MENU_SELECTOR) !== null,
     }
     sound.pressItem(target.closest(ITEM_SELECTOR))
+    // 泛化按压记录(含触发器/座席按钮):其 focus 静默由状态机裁决(镜像 #28)。
+    sound.pressUi(genericButton(target))
     sound.pressOutside(location, menuAlive())
   }
 
   const onHover = (e: MouseEvent): void => {
     const target = asElement(e.target)
     if (target === null) return
-    sound.itemHover(target.closest(ITEM_SELECTOR))
+    const item = target.closest(ITEM_SELECTOR)
+    if (item !== null) {
+      sound.itemHover(item)
+      return
+    }
+    if (target.closest(MENU_SELECTOR) !== null) return // 面板内非条目区域:条目路径权威
+    sound.uiHover(genericButton(target)) // null = 离开按钮面,重置去重
   }
 
   const onFocus = (e: FocusEvent): void => {
     const target = asElement(e.target)
     if (target === null) return
-    sound.itemFocus(target.closest(ITEM_SELECTOR))
+    const item = target.closest(ITEM_SELECTOR)
+    if (item !== null) {
+      sound.itemFocus(item)
+      return
+    }
+    if (target.closest(MENU_SELECTOR) !== null) return
+    sound.uiFocus(genericButton(target)) // 键盘同权:与悬停共用去重(2026-09-08)
   }
 
   const onKey = (e: KeyboardEvent): void => {

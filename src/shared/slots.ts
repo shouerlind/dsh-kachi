@@ -87,6 +87,8 @@ export const EVENT_IDS = [
   'menu-move',
   'menu-item-click',
   'menu-close',
+  'ui-click',
+  'ui-hover',
 ] as const
 
 export type EventId = (typeof EVENT_IDS)[number]
@@ -125,6 +127,10 @@ export const EVENT_SOUNDS: Record<EventId, { slot: SlotId; level: Level; volume:
   'menu-move': { slot: 'menuMove', level: 'foreground', volume: 100 },
   'menu-item-click': { slot: 'confirm', level: 'foreground', volume: 100 },
   'menu-close': { slot: 'cancel', level: 'foreground', volume: 100 },
+  // 全站按钮泛化(2026-09-08,§5 行 25/26):点击=按键音,悬停/键盘焦点=
+  // 菜单移动音;音量由槽位默认档承接(button@30 / menuMove@40)。
+  'ui-click': { slot: 'button', level: 'foreground', volume: 100 },
+  'ui-hover': { slot: 'menuMove', level: 'foreground', volume: 100 },
 }
 
 /**
@@ -174,6 +180,8 @@ export const INTERACTION_EVENT_IDS: ReadonlySet<EventId> = new Set<EventId>([
   'menu-move',
   'menu-item-click',
   'menu-close',
+  'ui-click',
+  'ui-hover',
 ])
 
 /**

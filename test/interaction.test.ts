@@ -181,3 +181,66 @@ describe('未选中关闭(SPEC §5.1)', () => {
     expect(played).toEqual(['menu-close'])
   })
 })
+
+describe('全站按钮泛化(ui-click / ui-hover;2026-09-08 决议)', () => {
+  it('按钮悬停:换目标才响,离开(null)重进同一按钮可再响', () => {
+    const { sound, played } = make()
+    sound.uiHover('a')
+    sound.uiHover('a') // 同按钮抖动不响
+    sound.uiHover('b')
+    sound.uiHover(null) // 离开按钮面
+    sound.uiHover('b') // 重进可再响
+    expect(played.filter((e) => e === 'ui-hover')).toHaveLength(3)
+  })
+
+  it('按钮点击 = ui-click 直报', () => {
+    const { sound, played } = make()
+    sound.uiClick()
+    expect(played).toEqual(['ui-click'])
+  })
+
+  it('键盘同权:focus 与悬停共用「最近发声目标」去重', () => {
+    const { sound, played } = make()
+    sound.uiHover('a')
+    sound.uiFocus('a') // 悬停已响过
+    sound.uiFocus('b') // 键盘移到下一颗
+    expect(played.filter((e) => e === 'ui-hover')).toHaveLength(2)
+  })
+
+  it('按压伴随 focus 静默:未悬停直接点击只留 click 一声(#28 同构)', () => {
+    const { sound, played } = make()
+    sound.pressUi('a') // pointerdown 落在该按钮
+    sound.uiFocus('a') // mousedown 聚焦 → 静默
+    sound.uiClick() // click → ui-click
+    expect(played).toEqual(['ui-click'])
+  })
+
+  it('按压记录消费后不残留;menuOpen 重置按压记录(镜像 #28)', () => {
+    const { sound, played } = make()
+    sound.pressUi('a')
+    sound.uiFocus('a') // 消费(静默)
+    sound.uiFocus('b') // → 响(1)
+    sound.pressUi('a')
+    sound.menuOpen(false) // 面板生命周期重置按压记录
+    sound.uiFocus('a') // 若未重置会被按压记录吞掉;重置后 → 响(2)
+    expect(played.filter((e) => e === 'ui-hover')).toHaveLength(2)
+  })
+
+  it('面板在场按到外部按钮:取消音 + 该次 ui-click 抑制(一次按压一声)', () => {
+    const { sound, played } = make()
+    sound.pressItem(null) // 每次按压起点
+    sound.pressOutside({ onTrigger: false, insideMenu: false }, true) // 取消音 + 记抑制
+    sound.uiClick()
+    expect(played).toEqual(['menu-close'])
+  })
+
+  it('抑制只覆盖当次按压:下一次按压(面板已关)点击照常响', () => {
+    const { sound, played } = make()
+    sound.pressItem(null)
+    sound.pressOutside({ onTrigger: false, insideMenu: false }, true)
+    sound.pressItem(null) // 新按压:清抑制标记;面板不在,pressOutside 不再响
+    sound.pressOutside({ onTrigger: false, insideMenu: false }, false)
+    sound.uiClick()
+    expect(played).toEqual(['menu-close', 'ui-click'])
+  })
+})

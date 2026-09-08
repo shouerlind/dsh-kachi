@@ -4,4 +4,5 @@ lib/
 src/client/pack-manifest.json
 .DS_Store
 .dsh-mattskillsdeck-cache/
+.workbuddy/
 *.tgz
