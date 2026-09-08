@@ -118,3 +118,17 @@
   点外豁免集,面板在场按到会话行仍响取消音。顶栏「空白」排查结论:品牌区
   (logo+字标+HARNESS)整体是「新建会话」快捷按钮(.brand flex:1 占满
   logoRow),空区发声符合规则,非误响。
+
+## code-review 收尾(2026-09-09,af86bba...HEAD 两轴评审)
+
+- 采纳修复:BUTTON_SELECTOR 注释漂移(泛化锚实为 UI_TARGET_SELECTOR 超集,
+  勿混用);CONTEXT.md 交互音词条补 ui-click/ui-hover 事件 ID;SPEC §5.1
+  补两句边界(座席豁免仅限点击分流,悬停发声属预期;泛化路径无需 150ms
+  抑制窗 —— portal 面板不位移布局,指针不会被动命中新按钮)。
+- 误报澄清:评审称「设置页菜单行在 .kachi-row 内被排除悬停」不实 ——
+  .kachi-row 仅自家注入两行(行内无 aria-haspopup),dsh 菜单行在其外,
+  触发器悬停音已生效。
+- 接受的边缘:面板在场按到自家设置行 = 取消音 + own-click 两声(own-click
+  走 React onClick,不经交互状态机,跨路抑制不值当,低频可忍)。
+- 保留:test 的 UI_TARGET_SELECTOR 字符串钉子 —— 规格锚,防锚点被改掉;
+  node 环境无 DOM 测试,胶水层行为按仓库惯例实机走查。

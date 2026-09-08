@@ -21,8 +21,9 @@ export const TRIGGER_SELECTOR = '[aria-haspopup="menu"],[aria-haspopup="listbox"
 export const MENU_SELECTOR = '[role="menu"],[role="listbox"]'
 /** 面板条目(ModelSelect 的 menuitem/menuitemradio 与 MenuView 的 option)。 */
 export const ITEM_SELECTOR = '[role="menuitem"],[role="menuitemradio"],[role="option"]'
-/** 候选按钮:菜单差分兜底的扫描面(仅座席内启用,见 SEAT_SELECTOR 注)+
- * 全站泛化(2026-09-08)的点击/悬停/焦点锚。 */
+/** 候选按钮:菜单差分兜底的扫描面 + 点外豁免的「触发器」判定面(均限座席内,
+ * 见 SEAT_SELECTOR 注)。全站泛化的点击/悬停/焦点锚是 UI_TARGET_SELECTOR
+ * (本选择器的超集),两者勿混用。 */
 export const BUTTON_SELECTOR = 'button,[role="button"]'
 /** 菜单差分判定等待渲染落定的窗口(ms;React 离散事件同步提交,一帧内可见)。 */
 export const MENU_DIFF_DELAY_MS = 50
