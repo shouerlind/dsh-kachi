@@ -6,7 +6,8 @@
  *    运行时哈希不可用);
  *  - 全站泛化按钮:点击=按键音(ui-click),悬停/键盘焦点=菜单移动音
  *    (ui-hover),面板内、自家设置行、座席按钮除外(各自路径权威);
- *    面板在场时按到外部按钮只响取消音,当次 ui-click 抑制。
+ *    面板在场时按到外部按钮只响取消音,当次 ui-click 抑制;会话列表行
+ *    (div[role=treeitem])经 UI_TARGET_SELECTOR 同规则接入。
  * 发声决策(触发器开关、悬停/焦点去重、按压伴随 focus 静默、菜单差分分类、
  * 点外抑制)收在 createInteractionSound 纯状态机(时钟注入,无 DOM 可测);
  * DOM 胶水只做 target → closest 翻译、面板存活读数与计时器,引擎发声只经
@@ -38,6 +39,15 @@ export const SEAT_SELECTOR = '[data-composer-seat]'
  * 跳过整行防双响。类名是自家样式表,非 CSS module 运行时哈希,可用。
  */
 export const OWN_ROW_SELECTOR = '.kachi-row'
+
+/**
+ * 全站泛化锚(2026-09-08):点击=按键音、悬停/键盘焦点=菜单移动音的目标集。
+ * `button/[role="button"]` 之外纳入 `[role="treeitem"]` —— 会话列表的常规
+ * 行/分组行是 div[role=treeitem] + onClick(ui-workspace Rows.tsx),搜索
+ * 结果行则是 button[role=treeitem];行内嵌套动作按钮取最内命中,不双响。
+ * treeitem 不进 BUTTON_SELECTOR/点外豁免集:面板在场按到会话行仍响取消音。
+ */
+export const UI_TARGET_SELECTOR = 'button,[role="button"],[role="treeitem"]'
 
 /** 面板打开后抑制首次悬停音的窗口(ms),防与确认音叠(SPEC §5.1)。 */
 export const OPEN_SUPPRESS_MS = 150
@@ -214,12 +224,13 @@ export function wireInteraction(doc: Document, engine: Pick<Engine, 'play'>): ()
     el !== null && el.closest(SEAT_SELECTOR) !== null ? el : null
 
   /**
-   * 泛化目标(2026-09-08):面板条目/面板容器/自家设置行之外最近按钮,
+   * 泛化目标(2026-09-08):面板条目/面板容器/自家设置行之外最近命中
+   * (UI_TARGET_SELECTOR,含 treeitem 会话行;行内嵌套按钮取最内),
    * 悬停与点击共用此排除集(条目与菜单路径权威;own-click 权威在自家行);
    * null = 不在泛化面(悬停/焦点路径兼作「离开按钮面」的重置信号)。
    */
   const genericButton = (target: Element): Element | null => {
-    const btn = target.closest(BUTTON_SELECTOR)
+    const btn = target.closest(UI_TARGET_SELECTOR)
     if (btn === null) return null
     if (btn.closest(MENU_SELECTOR) !== null || btn.closest(OWN_ROW_SELECTOR) !== null) return null
     return btn

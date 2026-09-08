@@ -111,3 +111,10 @@
   `pressItem` 起点清标记)。按压伴随 focus 静默镜像 #28(`pressUi`)。
 - SPEC §2/§5 行 25-26/§5.1/§9-7 与 ADR-0001 同步;gh 未登录,未开 GitHub
   工单,推送时一并补。
+- 会话列表接入(同日):常规会话行/分组行是 div[role=treeitem]+onClick
+  (dsh ui-workspace Rows.tsx),搜索结果行是 button[role=treeitem];
+  泛化锚扩为 UI_TARGET_SELECTOR = button,[role=button],[role=treeitem],
+  行内嵌套动作按钮(行菜单 chevron 等)取最内命中不双响;treeitem 不进
+  点外豁免集,面板在场按到会话行仍响取消音。顶栏「空白」排查结论:品牌区
+  (logo+字标+HARNESS)整体是「新建会话」快捷按钮(.brand flex:1 占满
+  logoRow),空区发声符合规则,非误响。

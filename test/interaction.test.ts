@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   OPEN_SUPPRESS_MS,
+  UI_TARGET_SELECTOR,
   createInteractionSound,
   type InteractionEvent,
 } from '../src/client/wiring/interaction.ts'
@@ -183,6 +184,10 @@ describe('未选中关闭(SPEC §5.1)', () => {
 })
 
 describe('全站按钮泛化(ui-click / ui-hover;2026-09-08 决议)', () => {
+  it('泛化锚含 treeitem:会话列表行(div[role=treeitem],非 button)也接入', () => {
+    expect(UI_TARGET_SELECTOR).toContain('[role="treeitem"]')
+  })
+
   it('按钮悬停:换目标才响,离开(null)重进同一按钮可再响', () => {
     const { sound, played } = make()
     sound.uiHover('a')
