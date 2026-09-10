@@ -1,8 +1,13 @@
 node_modules/
-lib/
 *.tsbuildinfo
 src/client/pack-manifest.json
 .DS_Store
 .dsh-mattskillsdeck-cache/
 .workbuddy/
 *.tgz
+vitest.config.ts.timestamp-*.mjs
+
+# lib/ 是构建产物,但**入库**(2026-09-10 起):插件要能经 `github:` 安装
+# (dsh 启动器只认 registry/git 来源,迁移功能对 link: 本地包不生效),而安装期
+# 不保证会跑脚本(prepare 可能被拦或在 --omit=dev 下失败)。所以产物随源码提交,
+# **改了 src/ 必须 `npm run build` 并把 lib/ 一起提交**,否则发布出去的是旧产物。

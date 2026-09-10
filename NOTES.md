@@ -1,6 +1,6 @@
 # 实现备忘(dsh-kachi)
 
-## 运行时事实(0.1.2-rc.1 实测,~/.dsh/profiles/node_modules/@deepseek-ai/)
+## 运行时事实(0.1.5-rc.1 实测;启动器有多个 home/版本,见「启动器、版本与 home」一节)
 
 - 双面插件:`dsh.bundle.patch`(cordis.patch.yml `- insert: [{id, name: 包名}]`)+ `dsh.client{platform:'web'}` + `exports["./client"]`。只声明 `dsh.client` 不会被装载(client 图来自 host Loader entries 扫描)。
 - client bundle 外壳:`window.__ModuleLoader__.load({id:"<包名>",factory:(require)=>{var module={exports:{}};var exports=module.exports; ...; return module.exports;}})`;externals 仅基线(react、cordis、client-store、ui-slots、ui-primitives)。
@@ -77,6 +77,48 @@
 同值不重发、dispose 拆监听)。typecheck 干净、128/128 绿、build 过。
 **待实机坐实**(静态链路完整 ≠ 运行必响,见 research 稿的保留):SPEC §9 第 8 条。
 
+
+## 依赖升到 0.1.5-rc.1 + 产物入库(2026-09-10)
+
+「适配最新版」的实质是**把编译期契约抬到运行时那一版**。
+
+- 10 个 `@deepseek-ai/dsh-*` devDeps 从 `0.1.2-rc.1` 精确钉到 **`0.1.5-rc.1`**;
+  `@deepseek-ai/cordis` 保持 `4.0.2`(运行时同为 4.0.2,无需动)。
+- **必须整族一起升**:0.1.5-rc.1 各包把兄弟包声明为 peer(`dsh-api-remotes` 要
+  `dsh-scope@^0.1.5-rc.1`),只改顶层 devDeps 会 `ERESOLVE`。npm 认为本地旧树冲突,解法是
+  **换掉整棵树**(把 `node_modules` 改名腾位后重装),**不要** `--legacy-peer-deps` / `--force`
+  —— 那会留下 0.1.2-rc.1 的 peer,类型与运行时对不上。peer 由 npm 自动补齐,不必手工登记。
+- **结论:零代码改动**。typecheck 干净、128/128 绿、build 过 —— 说明 0.1.2-rc.1 的边界本来就够用,
+  升版只是让类型面与运行时一致(消除「按旧类型写、到运行时才撞差异」这类风险)。
+
+**`lib/` 入库(`.gitignore` 放行)** —— 为了能经 `github:` 安装:
+
+- 启动器的**插件迁移只对 registry / git 来源生效**,`link:` 本地包不在其列(用户实测)。
+- 而 git 依赖拿不到构建产物:仓库原本 ignore `lib/`、又**没有** `prepare`,装出来是空壳。
+  **不加 `prepare` 是刻意的** —— 安装期脚本可能被启动器拦掉,或在 `--omit=dev` 下因缺 devDeps
+  直接失败,两条都等于装不上;把产物提交进 git 则两种情况都能装。
+- 代价:**改了 `src/` 必须 `npm run build` 并把 `lib/` 一起提交**,否则发出去的是旧产物
+  (`.gitignore` 里写了这条注释)。
+- `src/client/pack-manifest.json` 仍不入库:它被 `settings-ui.tsx` import,已内联进 `lib/client.js`,
+  运行时不从包里读;`files` 里原有那条已删(git 安装时该文件不存在,留着是空指针式的隐患)。
+
+## 启动器、版本与 home(2026-09-10 实测,推翻此前「运行时 = 某一版」的口径)
+
+本机 dsh 由 **dsh 启动器**(`%APPDATA%/in.dsh-plug.dsh-launcher`)管理,**同时装着两个版本、两个 home**:
+
+| 实例 | 版本 | home | 端口 | dsh-kachi |
+|---|---|---|---|---|
+| `0.1.2-rc.1` | 0.1.2-rc.1 | `~/.dsh`(用户默认) | 3080 | 有(`link:` 到仓库) |
+| `0.1.5-rc.1` | 0.1.5-rc.1 | `.../homes/0.1.5-rc.1` | 未固定 | **无**(待装) |
+
+- 真相来源:启动器 `config.json` 的 `homes` / `versions` / `instances` /
+  `settings.last_instance_id`(= 最近用过的实例,当前是 **0.1.5-rc.1**)。
+- 每个 home **各自**有 `profiles/<name>/package.json` 与 `node_modules`;
+  `profiles/node_modules/@deepseek-ai/*` 是 symlink → `<该 home 对应版本>/node_modules/.pnpm/...`。
+  **判版本要 `readlink` 看指向哪个版本目录**,不能只看包名 —— 同一条路径在不同时刻可能指向不同版本
+  (本会话实测:`~/.dsh/profiles/node_modules/@deepseek-ai/dsh-api-remotes` 先读到 0.1.5-rc.1,
+  十分钟后读到 0.1.2-rc.1;期间启动器在切换实例。未完全归因,故按「读一次不算数」处理)。
+- 所以「插件装在哪个 dsh 上」= 装到**那个 home 的 profile** 里,不是全局。
 
 ## 评审修复(code-review)
 

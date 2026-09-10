@@ -1,6 +1,6 @@
 {
   "name": "dsh-kachi",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "deepseek harness 音效插件:为 dsh 全部操作与 agent 状态变化播放 Nintendo Switch 系统同款音效(「事事有回应」)。含三级通知分级、后台白名单、设置页与全包选音。",
   "type": "module",
   "main": "lib/index.js",
@@ -24,8 +24,7 @@
   "files": [
     "lib",
     "assets/sounds",
-    "cordis.patch.yml",
-    "src/client/pack-manifest.json"
+    "cordis.patch.yml"
   ],
   "scripts": {
     "build": "node scripts/gen-pack-manifest.mjs && node scripts/build.mjs",
@@ -38,17 +37,17 @@
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.2",
-    "@deepseek-ai/dsh-api-remotes": "0.1.2-rc.1",
-    "@deepseek-ai/dsh-api-session-controller": "0.1.2-rc.1",
-    "@deepseek-ai/dsh-client-connection": "0.1.2-rc.1",
-    "@deepseek-ai/dsh-client-locale": "^0.1.2-rc.1",
-    "@deepseek-ai/dsh-client-ui-conversation": "^0.1.2-rc.1",
-    "@deepseek-ai/dsh-client-ui-settings": "0.1.2-rc.1",
-    "@deepseek-ai/dsh-client-ui-slots": "^0.1.2-rc.1",
-    "@deepseek-ai/dsh-host-webserver": "0.1.2-rc.1",
-    "@deepseek-ai/dsh-llm": "0.1.2-rc.1",
-    "@deepseek-ai/dsh-session": "0.1.2-rc.1",
-    "@deepseek-ai/dsh-settings": "0.1.2-rc.1",
+    "@deepseek-ai/dsh-api-remotes": "0.1.5-rc.1",
+    "@deepseek-ai/dsh-api-session-controller": "0.1.5-rc.1",
+    "@deepseek-ai/dsh-client-connection": "0.1.5-rc.1",
+    "@deepseek-ai/dsh-client-locale": "0.1.5-rc.1",
+    "@deepseek-ai/dsh-client-ui-conversation": "0.1.5-rc.1",
+    "@deepseek-ai/dsh-client-ui-settings": "0.1.5-rc.1",
+    "@deepseek-ai/dsh-client-ui-slots": "0.1.5-rc.1",
+    "@deepseek-ai/dsh-host-webserver": "0.1.5-rc.1",
+    "@deepseek-ai/dsh-llm": "0.1.5-rc.1",
+    "@deepseek-ai/dsh-session": "0.1.5-rc.1",
+    "@deepseek-ai/dsh-settings": "0.1.5-rc.1",
     "@types/node": "^26.4.1",
     "@types/react": "^18.3.1",
     "esbuild": "^0.24.0",
