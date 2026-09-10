@@ -29,8 +29,9 @@ dsh(deepseek harness)的音效插件:为 dsh 的所有操作与 agent 状态变�
 2. 在 profile 目录里执行包管理器安装(dsh profile 默认 pnpm):`pnpm install`。
 3. 重启 dsh,打开 web 界面,点击页面任意处应听到开机音。
 
-也可以让 dsh 启动器代劳:在插件面板里填 `github:shouerlind/dsh-kachi` 安装。**只有 registry /
-git 来源的插件能被启动器识别与迁移**,`file:` / `link:` 的本地包装不上这个能力。
+装到哪个 dsh 由你决定,关键是**来源必须非本地**:`file:` / `link:` 的本地包装不上启动器的
+插件迁移能力,所以依赖写 `github:`(或 registry / 其他 git 来源),不管是你手改 profile,
+还是用启动器装。
 
 > **产物已入库**:`lib/` 的 JS 产物随源码提交,所以 git 依赖装出来就是可用的(不依赖安装期构建脚本)。
 
