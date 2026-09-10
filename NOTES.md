@@ -120,6 +120,29 @@
   十分钟后读到 0.1.2-rc.1;期间启动器在切换实例。未完全归因,故按「读一次不算数」处理)。
 - 所以「插件装在哪个 dsh 上」= 装到**那个 home 的 profile** 里,不是全局。
 
+## 0.1.2 发版与安装验证(2026-09-10)
+
+提交 `471d6f0`(main,已推),tag `v0.1.2`,Release
+<https://github.com/shouerlind/dsh-kachi/releases/tag/v0.1.2>(资产 `dsh-kachi-0.1.2.tgz`,5.6MB / 232 文件)。
+
+**已验证的**:
+
+- 依赖树:`node_modules/@deepseek-ai/dsh-api-remotes|dsh-session|dsh-scope|dsh-client-connection`
+  实测均为 **0.1.5-rc.1**;typecheck 干净、**128/128 绿**、build 过 —— 零代码改动。
+- 远端确实带上了产物:`git clone --depth 1` 后 `ls lib/` = `client.js client.js.map index.js index.js.map`。
+- **git 依赖会拿到的内容** = 在新鲜克隆里跑 `npm pack --dry-run`:`lib/*`(4 个)+ `cordis.patch.yml`
+  + `assets/sounds/**`,合计 **232 文件** —— 与 tgz 一致。
+- npm 能解析仓库:`npm view github:shouerlind/dsh-kachi` → `dist-tags.latest = 0.1.2`。
+
+**未验证(交给用户实机)**:
+
+- **端到端 `npm install github:…` 在本沙箱里挂住**:试了 `github:shouerlind/dsh-kachi` 与
+  `git+https://github.com/shouerlind/dsh-kachi.git` 两种形式,各 7 分钟以上无输出被杀。
+  同时 `git clone --depth 1` 只用了几秒、`npm view github:` 秒回 —— 所以**不是认证问题,
+  更像 npm 走全量 clone 在这个代理网络下极慢**。启动器用的是它自己的包管理器与缓存,
+  用户此前已用 `github:` 装过 `dsh-bookmate`,故预期可用;实在不成走 tgz 备用路径。
+- 需要时可**钉标签**装:`git+https://github.com/shouerlind/dsh-kachi.git#v0.1.2`。
+
 ## 评审修复(code-review)
 
 - 事件音量系数落地(play 读 mapping.volume);节流占位提前到解码前防并发双响。
