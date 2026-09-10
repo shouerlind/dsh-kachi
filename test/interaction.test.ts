@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
   OPEN_SUPPRESS_MS,
+  OWN_ROW_SELECTOR,
   UI_TARGET_SELECTOR,
   createInteractionSound,
   type InteractionEvent,
 } from '../src/client/wiring/interaction.ts'
+import { OWN_ROW_CLASS } from '../src/client/settings/row.ts'
 
 /** 状态机夹具:记录发声序列 + 可拨动时钟;item 用字符串指代元素引用。 */
 function make() {
@@ -186,6 +188,10 @@ describe('未选中关闭(SPEC §5.1)', () => {
 describe('全站按钮泛化(ui-click / ui-hover;2026-09-08 决议)', () => {
   it('泛化锚含 treeitem:会话列表行(div[role=treeitem],非 button)也接入', () => {
     expect(UI_TARGET_SELECTOR).toContain('[role="treeitem"]')
+  })
+
+  it('自家行排除锚指的就是设置行组件套上的那个类名(同源,无第二份字面量)', () => {
+    expect(OWN_ROW_SELECTOR).toBe(`.${OWN_ROW_CLASS}`)
   })
 
   it('按钮悬停:换目标才响,离开(null)重进同一按钮可再响', () => {

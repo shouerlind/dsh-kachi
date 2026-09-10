@@ -13,6 +13,7 @@
  * DOM 胶水只做 target → closest 翻译、面板存活读数与计时器,引擎发声只经
  * 状态机的 play 回调。
  */
+import { OWN_ROW_SELECTOR } from '../settings/row.ts'
 import type { Engine } from '../engine/audio-engine.ts'
 
 /** 触发器(全站带 aria 标记的菜单按钮;dsh 实测取值 menu 与 listbox —— composer 命令菜单 + 钮即 listbox)。 */
@@ -37,9 +38,10 @@ export const SEAT_SELECTOR = '[data-composer-seat]'
 
 /**
  * 自家设置行容器(settings-ui.tsx,own-click 已接线 §5 行 18):泛化路径
- * 跳过整行防双响。类名是自家样式表,非 CSS module 运行时哈希,可用。
+ * 跳过整行防双响。标记类名与选择器同源于 settings/row.ts —— 改名会在
+ * 两侧一起改,不再是可能静默失配的字符串约定。
  */
-export const OWN_ROW_SELECTOR = '.kachi-row'
+export { OWN_ROW_SELECTOR } from '../settings/row.ts'
 
 /**
  * 全站泛化锚(2026-09-08):点击=按键音、悬停/键盘焦点=菜单移动音的目标集。

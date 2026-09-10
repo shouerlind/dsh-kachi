@@ -10,14 +10,14 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { KachiSettings } from '../shared/settings.ts'
 import { SETTINGS_NAMESPACE } from '../shared/settings.ts'
+import { toSlotFile, type SlotId } from '../shared/slots.ts'
 import { createEngine } from './engine/audio-engine.ts'
 import { installUnlock } from './engine/unlock.ts'
 import { wireLayerB } from './wiring/layer-b.ts'
 import { wireLayerC } from './wiring/layer-c.ts'
 import { wireInteraction } from './wiring/interaction.ts'
 import { bindKachiSettings } from './settings/controller.ts'
-import { engineSettingsTarget } from './settings/bridge.ts'
-import { applyKachiSettings, shouldPlayBoot } from './settings/policy.ts'
+import { applyKachiSettings, shouldPlayBoot, type EngineSettingsApi } from './settings/policy.ts'
 import { KachiGeneralRow, KachiSlotsRow, type KachiInject } from './settings/settings-ui.tsx'
 
 export const inject = ['sessions', 'settingsScope', 'slots', 'locale']
@@ -28,8 +28,8 @@ export function apply(ctx: Context): void {
   const controller = bindKachiSettings((spec) => ctx.settingsScope.bind<KachiSettings>(spec))
   const injectFace: KachiInject = {
     settings: controller,
-    preview: (file, pack) => {
-      void engine.preview({ file, pack })
+    preview: (file) => {
+      void engine.preview(toSlotFile(file))
     },
     // 自家注入组件点击 → 按键音(SPEC §5 行 18)。
     click: () => {
@@ -37,8 +37,19 @@ export function apply(ctx: Context): void {
     },
   }
 
-  // 设置快照 → 引擎(总开关/总音量/节流窗/槽位音量/槽位选音)。
-  const settingsTarget = engineSettingsTarget(engine)
+  // 设置快照 → 引擎(总开关/总音量/节流窗/槽位音量/槽位选音)。适配面就建在
+  // 组合根:policy 的最小接口用 string 槽位(便于测试),引擎用 SlotId,
+  // 这里只做翻译,不再单开一个透传模块。
+  const settingsTarget: EngineSettingsApi = {
+    setEnabled: (enabled) => engine.setEnabled(enabled),
+    setMasterVolume: (percent) => engine.setMasterVolume(percent),
+    setThrottleMs: (ms) => engine.setThrottleMs(ms),
+    setSlotVolume: (slot, percent) => engine.setSlotVolume(slot as SlotId, percent),
+    setSlotSound: (slot, file) => {
+      void engine.setSlotSound(slot as SlotId, toSlotFile(file))
+    },
+    currentFile: (slot) => engine.currentSlotFile(slot as SlotId),
+  }
   ctx.effect(
     () => {
       const detach = controller.subscribe(() => applyKachiSettings(controller.getSnapshot(), settingsTarget))
