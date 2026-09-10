@@ -17,8 +17,13 @@ dsh(deepseek harness)的音效插件:为 dsh 的所有操作与 agent 状态变�
    - `dependencies` 里加依赖:
 
      ```json
-     "dsh-kachi": "github:shouerlind/dsh-kachi"
+     "dsh-kachi": "git+https://github.com/shouerlind/dsh-kachi.git#v0.1.2"
      ```
+
+     **用显式 https,不要用 `github:shouerlind/dsh-kachi` 简写** —— 简写不解析成显式 URL,
+     而它可选的 git 形态分别是 `git://`(GitHub 已停用)与 `git+ssh://`(需要 SSH 密钥)。
+     本机实测无 SSH 密钥(`Permission denied (publickey)`),而 https 走 Windows 凭据管理器
+     (`credential.helper=manager`)可用。要跟最新就把 `#v0.1.2` 去掉。
 
    - `dsh.profile.bundles` 数组末尾加一项:
 
@@ -30,8 +35,8 @@ dsh(deepseek harness)的音效插件:为 dsh 的所有操作与 agent 状态变�
 3. 重启 dsh,打开 web 界面,点击页面任意处应听到开机音。
 
 装到哪个 dsh 由你决定,关键是**来源必须非本地**:`file:` / `link:` 的本地包装不上启动器的
-插件迁移能力,所以依赖写 `github:`(或 registry / 其他 git 来源),不管是你手改 profile,
-还是用启动器装。
+插件迁移能力,所以依赖写成 git / registry 来源,不管是你手改 profile,还是用启动器装。
+仓库是私有的,所以装的那台机器要有该仓库的 git 凭据(https + 凭据管理器即可)。
 
 > **产物已入库**:`lib/` 的 JS 产物随源码提交,所以 git 依赖装出来就是可用的(不依赖安装期构建脚本)。
 
