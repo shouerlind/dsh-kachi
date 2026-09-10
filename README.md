@@ -12,31 +12,29 @@ dsh(deepseek harness)的音效插件:为 dsh 的所有操作与 agent 状态变�
 
 ## 安装(经 GitHub,推荐 —— 启动器可迁移)
 
-1. 编辑你的 dsh profile 的 `package.json`(`<home>/profiles/<profile>/package.json`),改两处:
+在 profile 目录下一条命令(profile 默认用 pnpm;`pnpm add` 会替你写 `dependencies`):
 
-   - `dependencies` 里加依赖:
+```sh
+pnpm add "git+https://github.com/shouerlind/dsh-kachi.git#v0.1.2"
+```
 
-     ```json
-     "dsh-kachi": "git+https://github.com/shouerlind/dsh-kachi.git#v0.1.2"
-     ```
+**再往同一个 `package.json` 的 `dsh.profile.bundles` 数组里加一行** `"dsh-kachi"`,然后重启 dsh。
 
-     **用显式 https,不要用 `github:shouerlind/dsh-kachi` 简写** —— 简写不解析成显式 URL,
-     而它可选的 git 形态分别是 `git://`(GitHub 已停用)与 `git+ssh://`(需要 SSH 密钥)。
-     本机实测无 SSH 密钥(`Permission denied (publickey)`),而 https 走 Windows 凭据管理器
-     (`credential.helper=manager`)可用。要跟最新就把 `#v0.1.2` 去掉。
+这一步不能省也不能由 pnpm 代劳 —— profile 的 `cordis.yml` 自己写着:插件树的组合顺序是
+「`package.json` 的 `dsh.profile.bundles` 中每个 bundle → `cordis.patch.yml` → `--patch` 覆盖层」,
+bundle 才是登记点。(`dsh plugin --profile <name> add <spec>` 只是把参数转发给 pnpm,同样只改 dependencies。)
 
-   - `dsh.profile.bundles` 数组末尾加一项:
+两个易错点:
 
-     ```json
-     "dsh-kachi"
-     ```
+- **用显式 https,不要用 `github:shouerlind/dsh-kachi` 简写** —— 简写不解析成显式 URL,其 git 形态是
+  `git://`(GitHub 已停用)或 `git+ssh://`(需要 SSH 密钥)。本机实测无 SSH 密钥
+  (`Permission denied (publickey)`),而 https 走 Windows 凭据管理器(`credential.helper=manager`)可用。
+- **不要动 profile 的 `cordis.patch.yml`**。本包自带 `dsh.bundle.patch`,挂进 `dsh.profile.bundles` 后
+  bundle 层会自动应用它的 insert;再手写一条 `id: dsh-kachi` 的 insert 会插两次,启动即崩:
+  `duplicate loader entry id: dsh-kachi`。该文件保持 `[]` 即可。
 
-2. 在 profile 目录里执行包管理器安装(dsh profile 默认 pnpm):`pnpm install`。
-3. 重启 dsh,打开 web 界面,点击页面任意处应听到开机音。
-
-装到哪个 dsh 由你决定,关键是**来源必须非本地**:`file:` / `link:` 的本地包装不上启动器的
-插件迁移能力,所以依赖写成 git / registry 来源,不管是你手改 profile,还是用启动器装。
-仓库是私有的,所以装的那台机器要有该仓库的 git 凭据(https + 凭据管理器即可)。
+装到哪个 dsh 由你决定,关键是**来源必须非本地**:`file:` / `link:` 的本地包装不上启动器的插件迁移能力。
+仓库是私有的,装的那台机器要有该仓库的 git 凭据(https + 凭据管理器即可)。
 
 > **产物已入库**:`lib/` 的 JS 产物随源码提交,所以 git 依赖装出来就是可用的(不依赖安装期构建脚本)。
 
