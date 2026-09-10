@@ -120,6 +120,45 @@
   十分钟后读到 0.1.2-rc.1;期间启动器在切换实例。未完全归因,故按「读一次不算数」处理)。
 - 所以「插件装在哪个 dsh 上」= 装到**那个 home 的 profile** 里,不是全局。
 
+## code-review 收尾(2026-09-10,793e06b..HEAD 两轴评审)
+
+固定点 `793e06b`(即交接稿的基点),覆盖 `a153699`(三音)→ `471d6f0`(升版 + 产物入库 + 发 0.1.2)
+→ `a4daa4b`(NOTES 补充)。剔除 `lib/**` 与 `package-lock.json` 两个生成物后 15 文件。
+
+**Standards 轴 —— 无明文规范硬违规。** 改动与 CONTEXT 词表(警示音/恢复音/交互音)、
+SPEC §3.2/§5、ADR-0001、以及 NOTES 的硬约定(勿手写 `cordis.patch.yml`、`lib/` 入库)一致;
+新增的 `layer-a` / `wireConnection` 测试都是接口级,符合「非 DOM 胶水层一律接口级测试」。
+两条判断题,均**不修**:
+
+1. **Primitive Obsession(轻)**:`layer-c.ts` 的 `ConnectionStateLike.getSnapshot(): string | undefined`
+   与 `wireConnection` 里的 `'connecting' | 'connected' | 'disconnected'` 裸字符串;同批的
+   `layer-a.ts` 已用 `REMOTE_EVENTS` 集中事件名,风格不统一。
+   _不修的理由_:这三个值是 dsh 公开类型 `ConnectionState` 的字面量,结构子集**刻意**不复刻上游类型
+   (与本仓库 `JournalEventLike` / `EventSourceLike` 同源做法);再立一层本地枚举,只是多一处会漂的真相。
+2. **不透明类型(轻)**:`layer-a.ts` 的 `RemoteListener = (...args: never[]) => unknown` 用 `never`
+   封住调用面,初读费解。_不修的理由_:这是让 dsh 的泛型 `$on` 可结构化赋值、又不复刻上游 per-event
+   声明的代价;同文件已写明原因,`test/layer-a.test.ts` 另用具名 `Waterfall`/`Emit` 把可调用形态还原出来。
+
+**Spec 轴 —— 未发现漏项、范围蔓延或实现错误。** 逐条对账:
+
+- §5 行 3:提问走 A 层 waterfall 且 `return next()` 放行;槽位 `notifyImportant`、介入级 100% ✓
+- §5 行 7:A 半 `api-session/error`(emit,无 next)补齐 —— 该行本就是双源合成行 ✓
+- §5 行 16/17:`connecting` → 警示音、`connected` → 恢复音;首连静默、`disconnected` 静默且不复位 ✓
+- §3.2 三条硬约束全部满足;旧「replace 帧 + 5s 去重」恢复音路径整体移除(替换而非新增)✓
+- SPEC 全文无残留「无通路 / 未实现」表述(漂移只留在本文「通路差异与缺口」段,且已标作废)✓
+
+**一条误报已澄清并留证**(评审报告称「`slots.ts:136` `reconnecting` 音量 100,而 SPEC §5 行 16 规定 90%,
+§9 第 1 条实际未达标」):**不成立**。SPEC 音量列由**槽位主档**承载 ——
+`DEFAULT_SLOT_VOLUMES.warn = 90`(`slots.ts:59`);事件行 `volume` 只在「低于主档」时才写
+(如 `tool-result-fail` 70 / `jobs-completed` 60),与主档一致时恒为 100,引擎也是
+`if (mapping.volume < 100)` 才叠加(`audio-engine.ts:204`)。这正是 `slots.ts:112-118` 写明的
+**单一承载层**约定,且 `test/slots.test.ts:103` 有一条专门钉它(「断线警示音量由 warn 槽默认承载 @90」)。
+评审读的是事件行字段,不是等效音量。
+
+**与 issue #19 的一处偏差(正确取舍,记录在案)**:#19 的「What to build」曾要求
+「重连恢复音保持现有 journal 信号」;本次改为 `ctx.connection.state` **单源**。该条被违背,但符合
+SPEC §3.2 硬约束 3 与研究稿 §2 的结论(权威信号 vs 启发式),而 #19 本身已是 `wontfix` 作废。
+
 ## 0.1.2 发版与安装验证(2026-09-10)
 
 提交 `471d6f0`(main,已推),tag `v0.1.2`,Release
