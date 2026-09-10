@@ -8,7 +8,7 @@
 
 Issues are tracked in GitHub Issues (repo `shouerlind/dsh-kachi`), via the `gh` CLI. See `docs/agents/issue-tracker.md`.
 
-> `gh` 在本机需要显式指定配置目录:`GH_CONFIG_DIR="C:\Users\kona\AppData\Roaming\GitHub CLI"`(OAuth 令牌存于 Windows 凭据管理器),否则报未登录。
+> `gh` 在本机需要显式指定配置目录:`GH_CONFIG_DIR="%APPDATA%\GitHub CLI"`(OAuth 令牌存于 Windows 凭据管理器),否则报未登录。
 
 ### Triage labels
 

@@ -20,7 +20,7 @@
 
 - `C:\dsh-kachi-dev` junction(避开空格路径 bug)→ 本仓库。
 - kachi-test profile(~/.dsh/profiles/kachi-test,bundles: base + web-app + dsh-kachi)。
-- 启动:`node "C:\Users\kona\AppData\Roaming\npm\node_modules\@deepseek-ai\dsh\lib\bin.js" --profile kachi-test --port 3099`(在 ~ 下执行)。
+- 启动:`node "%APPDATA%\npm\node_modules\@deepseek-ai\dsh\lib\bin.js" --profile kachi-test --port 3099`(在 ~ 下执行)。
 - 浏览器已验证:boot graph 含 dsh-kachi、点击解锁后 fetch boot.wav、无 console 错误。
 
 ## 通路差异与缺口(0.1.2-rc.1 实测,评审确认)
