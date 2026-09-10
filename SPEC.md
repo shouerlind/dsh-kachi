@@ -4,7 +4,7 @@
 
 ## 1. 概述
 
-**dsh-kachi** 是 deepseek harness(dsh)的 client(浏览器)端音效插件:对 dsh 的所有操作与 agent 状态变化播放任天堂 Switch 系统同款音效,「事事有回应」。npm 包名 `dsh-kachi`,仓库 `shouerlind/ns-notify`(私有),纯个人自用。
+**dsh-kachi** 是 deepseek harness(dsh)的 client(浏览器)端音效插件:对 dsh 的所有操作与 agent 状态变化播放任天堂 Switch 系统同款音效,「事事有回应」。npm 包名 `dsh-kachi`,仓库 [`shouerlind/dsh-kachi`](https://github.com/shouerlind/dsh-kachi)(公开),纯个人自用。
 
 - dsh 版本基准:主用最新版(当前 0.1.2-alpha.1),跨版本不设硬兼容约束。
 - 界面基准:本地 web GUI;终端等非 web 界面不在范围内。
@@ -15,7 +15,7 @@
 **做**:web 界面操作确认音、agent 状态提示音、后台重要通知、设置页(含全包选音)、全站交互音(二级面板悬停/点击/关闭,经 DOM 委托覆盖,见 [ADR-0001](docs/adr/0001-dsh-ui-sounds-dom-delegation.md);工单 #20 已推广至全站)、全站按钮泛化(2026-09-08:所有可点按钮点击=按键音、悬停/键盘焦点=菜单移动音,侧边栏/设置一级导航自动覆盖)。
 
 **不做**:
-- 公开分发 / 上架 dsh-market(版权音效仅限个人自用;仓库已私有);
+- 上架 dsh-market / 把音效作为可再分发资产分发(代码仓库已公开,但 `assets/sounds/` 内为任天堂版权音效,仅限个人自用);
 - 非 web 界面的音效;
 - 改 dsh 源码或要求 dsh 提供全局 UI 事件总线(交互音走插件内无源 DOM 委托,ADR-0001);
 - 流式 token 级音效(assistant/chunk 静默级)。
@@ -121,7 +121,7 @@
 
 - `assets/sounds/`:13 个默认槽位文件;`assets/sounds/pack/`:全包 211 个 WAV(选音池);
 - 格式 WAV(源 rip 原生,浏览器原生支持;MP3 压缩仅为未来体积优化项);
-- 来源 [TOM-BadEN/Nintendo-Switch-Sounds-Effect](https://github.com/TOM-BadEN/Nintendo-Switch-Sounds-Effect);**仅限个人自用,仓库私有,不公开分发**;
+- 来源 [TOM-BadEN/Nintendo-Switch-Sounds-Effect](https://github.com/TOM-BadEN/Nintendo-Switch-Sounds-Effect);**版权属任天堂,仅限个人自用,不随本仓库代码许可再分发**;
 - 挑选注意:源包存在大量亚 50ms 微碎片,换音须「语义 + 时长 ≥0.1s」双筛;
 - 完整对照表见 [assets/sounds/MANIFEST.md](assets/sounds/MANIFEST.md)。
 

@@ -6,7 +6,7 @@
 
 - **目录**:`assets/sounds/`(在用 13 个)+ `assets/sounds/pack/`(全包 211 个,设置页选音池)。
 - **格式**:WAV(源 rip 原生格式,浏览器全平台原生支持,免转码)。
-- **来源**:[TOM-BadEN/Nintendo-Switch-Sounds-Effect](https://github.com/TOM-BadEN/Nintendo-Switch-Sounds-Effect)(211 个 Switch 官方 rip,按任天堂内部命名整理)。仅限个人自用;仓库已转私有,不做公开分发。
+- **来源**:[TOM-BadEN/Nintendo-Switch-Sounds-Effect](https://github.com/TOM-BadEN/Nintendo-Switch-Sounds-Effect)(211 个 Switch 官方 rip,按任天堂内部命名整理)。仅限个人自用;版权属任天堂,不随本仓库代码许可再分发。
 - **选音坑**:源包内大量亚 50ms「微碎片」文件(如 SeNtfInImage 0.00s、SeGiftReceive 0.00s),挑选时须用「语义 + 时长 ≥0.1s」双筛。
 - **音量变体不另建文件**:同一文件按映射表以不同音量复用(如工具调用=按键音@30%)。
 

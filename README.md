@@ -34,7 +34,7 @@ bundle 才是登记点。(`dsh plugin --profile <name> add <spec>` 只是把参�
   `duplicate loader entry id: dsh-kachi`。该文件保持 `[]` 即可。
 
 装到哪个 dsh 由你决定,关键是**来源必须非本地**:`file:` / `link:` 的本地包装不上启动器的插件迁移能力。
-仓库是私有的,装的那台机器要有该仓库的 git 凭据(https + 凭据管理器即可)。
+仓库已公开,装的那台机器**不需要**任何 GitHub 凭据。
 
 > **产物已入库**:`lib/` 的 JS 产物随源码提交,所以 git 依赖装出来就是可用的(不依赖安装期构建脚本)。
 
