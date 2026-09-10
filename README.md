@@ -25,11 +25,14 @@ pnpm add "git+https://github.com/shouerlind/dsh-kachi.git#v0.1.3"
 「`package.json` 的 `dsh.profile.bundles` 中每个 bundle → `cordis.patch.yml` → `--patch` 覆盖层」,
 bundle 才是登记点。(`dsh plugin --profile <name> add <spec>` 只是把参数转发给 pnpm,同样只改 dependencies。)
 
-两个易错点:
+两点注意:
 
-- **用显式 https,不要用 `github:shouerlind/dsh-kachi` 简写** —— 简写不解析成显式 URL,其 git 形态是
-  `git://`(GitHub 已停用)或 `git+ssh://`(需要 SSH 密钥)。本机实测无 SSH 密钥
-  (`Permission denied (publickey)`),而 https 走 Windows 凭据管理器(`credential.helper=manager`)可用。
+- **用显式 https 并钉 tag**:`git+https://github.com/shouerlind/dsh-kachi.git#v0.1.3`。
+  `github:shouerlind/dsh-kachi` 简写现在**也能装上**(2026-09-10 实测:npm 11.17.0 / Node 24.19.0,
+  本机无 SSH 密钥仍成功解析到 `dsh-kachi`),但它没有版本钉子 —— `npm-package-arg` 对简写只给出
+  `fetchSpec: null` 加一组候选 URL(https / ssh / git),协议由 npm 自己挑,装到的是**默认分支当时的状态**:
+  同样的命令,不同时间装出不同版本。(简写曾在本机失败过,原因不是简写本身,而是当时仓库**私有** ——
+  匿名 https 读不到、又无 SSH 密钥;转为公开后这个前提就消失了。)
 - **不要动 profile 的 `cordis.patch.yml`**。本包自带 `dsh.bundle.patch`,挂进 `dsh.profile.bundles` 后
   bundle 层会自动应用它的 insert;再手写一条 `id: dsh-kachi` 的 insert 会插两次,启动即崩:
   `duplicate loader entry id: dsh-kachi`。该文件保持 `[]` 即可。

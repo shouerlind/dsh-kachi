@@ -28,7 +28,7 @@
 
 - 包根 `package.json`:`"dsh": { "client": { "platform": "web", "inject": [...] } }`,构建产物挂 `exports["./client"]` → `lib/client.js`;
 - 插件体:`export const inject = [...]` + `export function apply(ctx)`;
-- 安装:开发期 `dsh plugin --profile web add .`(仓库目录内执行);稳定后经 git 依赖装,权威步骤见 README「安装」节(`github:` 简写在无 SSH 密钥的机器上不可用);
+- 安装:开发期 `dsh plugin --profile web add .`(仓库目录内执行);稳定后经 git 依赖装,权威步骤见 README「安装」节(用显式 https + 钉 tag,不靠 `github:` 简写 —— 简写无版本钉子、协议由 npm 自选);
 - profile:主用 `web` profile 一份(`~/.dsh/profiles/web`);profiles 与 dsh 版本解耦,旧版 dsh 加载不了就旧版不装。
 
 ### 3.2 事件接线(三层,均已在工单 #2 研究中验证可行)

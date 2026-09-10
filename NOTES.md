@@ -182,7 +182,10 @@ SPEC §3.2 硬约束 3 与研究稿 §2 的结论(权威信号 vs 启发式),而
 
 **未验证(交给用户实机)**:
 
-- **端到端 `npm install github:…` 在本沙箱里挂住**:试了 `github:shouerlind/dsh-kachi` 与
+- **(2026-09-10 晚复核:此条已作废)** 同一命令后来在 **17 秒内成功**,见本文末尾「安装协议与
+  `github:` 简写的实测」;当时的「7 分钟无输出」是沙箱网络/代理的偶发问题,与认证无关 ——
+  原条目的判断(「不是认证问题」)方向正确,但「预期可用」现已升级为**实测可用**。
+  **端到端 `npm install github:…` 在本沙箱里挂住**:试了 `github:shouerlind/dsh-kachi` 与
   `git+https://github.com/shouerlind/dsh-kachi.git` 两种形式,各 7 分钟以上无输出被杀。
   同时 `git clone --depth 1` 只用了几秒、`npm view github:` 秒回 —— 所以**不是认证问题,
   更像 npm 走全量 clone 在这个代理网络下极慢**。启动器用的是它自己的包管理器与缓存,
@@ -414,3 +417,35 @@ IDM 三个标记都不在);`sound-files` / `slots` / `engine` 三处断言随路
 
 **接口变更记录**:`SoundFetcher` 由 `{ ok, arrayBuffer() }` 改为 `{ ok, json() }` ——
 属测试面共享的最小结构面,非公开 API。`npm run typecheck` 干净,`npm test` 154/154 绿。
+
+## 安装协议与 `github:` 简写的实测(2026-09-10)
+
+修正 README 的一条旧结论。此前写「不要用 `github:` 简写、其 git 形态是 `git://` 或
+`git+ssh://`」,隐含前提是**仓库私有**;转为公开后该前提消失。
+
+实测环境:npm 11.17.0 / Node 24.19.0,Windows;`~/.ssh` 只有 `known_hosts`(无私钥);
+无 `url.*.insteadOf` 改写;`credential.helper=manager`。
+
+| 检查 | 结果 |
+|---|---|
+| `ssh -T git@github.com`(BatchMode) | `Permission denied (publickey)`,退出 255 |
+| `git ls-remote git@github.com:shouerlind/dsh-kachi.git` | 同上,退出 255 |
+| `git ls-remote git://github.com/shouerlind/dsh-kachi.git` | 连接超时(9418 不通),退出 128 |
+| `git -c credential.helper= ls-remote https://…` | 成功,4 个 tag 全列出,退出 0 |
+| `npm install --dry-run github:shouerlind/dsh-kachi` | **成功**,解析到 `dsh-kachi 0.1.3`,退出 0 |
+
+本机既无 SSH 密钥、`git://` 又不通,简写仍然成功 —— 即 npm 走的是**匿名 https**。
+
+`npm-package-arg` 的解析证实简写确实「不解析成显式 URL」,而且**不带版本钉子**:
+
+| 参数 | `fetchSpec` | `gitCommittish` |
+|---|---|---|
+| `github:shouerlind/dsh-kachi` | `null` | `null` |
+| `github:shouerlind/dsh-kachi#v0.1.3` | `null` | `v0.1.3` |
+| `git+https://github.com/shouerlind/dsh-kachi.git#v0.1.3` | `https://…` | `v0.1.3` |
+
+**结论**:README 改为「推荐显式 https + 钉 tag」,理由从「简写会失败」换成「简写不可复现」
+(协议由 npm 自选,且装的是默认分支当时的状态)。钉 tag 的显式形态仍是唯一可复现的写法。
+
+**注**:此修正只改了 README 措辞,无代码改动,故未重发版本 —— `v0.1.3` tag 与 tgz 里的 README
+仍是旧措辞快照;GitHub 首页渲染的是 main 的最新版。
