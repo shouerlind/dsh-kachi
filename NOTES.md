@@ -445,7 +445,41 @@ IDM 三个标记都不在);`sound-files` / `slots` / `engine` 三处断言随路
 | `git+https://github.com/shouerlind/dsh-kachi.git#v0.1.3` | `https://…` | `v0.1.3` |
 
 **结论**:README 改为「推荐显式 https + 钉 tag」,理由从「简写会失败」换成「简写不可复现」
-(协议由 npm 自选,且装的是默认分支当时的状态)。钉 tag 的显式形态仍是唯一可复现的写法。
+(协议由 npm 自选,且不带 committish 时装的是默认分支当时的状态)。**可复现的判据是 committish,
+不是 URL 的写法** —— 见下节的规范化行为。
 
 **注**:此修正只改了 README 措辞,无代码改动,故未重发版本 —— `v0.1.3` tag 与 tgz 里的 README
 仍是旧措辞快照;GitHub 首页渲染的是 main 的最新版。
+
+## 0.1.3 在真实实例上的端到端验证(2026-09-10)
+
+用户自己的运行实例(launcher home 的 `web` profile;原先 spec 为 `git+https://…` 不带 tag、
+lock 钉在 `cbcbf7f`)已升级到 `#v0.1.3` 并重启。重启后实测端点行为(HTTP,无需凭据):
+
+| 请求 | 结果 |
+|---|---|
+| `GET /dsh-kachi/sound?file=boot.wav` | 200 `application/json; charset=utf-8`,body `{"b64":"UklGRlI0AQBXQVZF…` —— base64 解出 `RIFF…WAVE`,与磁盘原文件一致 |
+| `GET /dsh-kachi/sound?file=pack/SeNewsBad.wav` | 200 JSON 封套 |
+| `GET /dsh-kachi/sounds/boot.wav`(旧路由) | **404** —— 已删 |
+| `GET /dsh-kachi/sound?file=../package.json` | 404(路径安全) |
+| `GET /dsh-kachi/sound?file=nope.wav` | 404 |
+
+**重启前的对照**:同一实例在重启前 `sound?file=` 返回 404、旧 `/sounds/boot.wav` 返回 200 ——
+证明 host 半是启动时载入内存的,**依赖升级后必须重启才生效**;升级完成到重启之间还存在一个
+「新 client 问新端点、旧 host 只认旧路由」的静音窗口。
+
+**操作细节**(留给下次):
+
+- `pnpm add "git+https://github.com/shouerlind/dsh-kachi.git#v0.1.3"` 会把 spec **规范化成
+  `github:shouerlind/dsh-kachi#v0.1.3`** 写回 profile 的 `package.json`;lockfile 钉到提交
+  `ba3b901` + sha512。这印证了上节结论:判据是 committish,不是 URL 的写法。
+- 该 profile 的 git 依赖传输走 `codeload.github.com`,本机对它有偶发超时 / ECONNRESET;
+  加 `--fetch-timeout=900000 --fetch-retries=6` 后在 4m56s 内成功。失败时 pnpm 是事务性的,
+  profile 不会被改坏(spec / lock / node_modules 均原样)。
+- 该 profile 的 `.npmrc` 有 `auto-install-peers=false`,守住了「profile 不得自带核心包副本」——
+  装完 `@deepseek-ai/schemastery` 确实不在 profile 的 node_modules 里。
+- 升级前已备份 profile 的 `package.json` + `pnpm-lock.yaml` 到
+  `profiles/web/.upgrade-backup-20260910-230345/`。
+
+**另一套 profile 无需处理**:`~/.dsh/profiles/web` 用的是 `link:D:\deepseek harness\ns-notify`
+(junction),直接指向本仓库,重建 `lib/` 后即为最新。

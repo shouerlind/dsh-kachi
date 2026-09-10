@@ -33,6 +33,9 @@ bundle 才是登记点。(`dsh plugin --profile <name> add <spec>` 只是把参�
   `fetchSpec: null` 加一组候选 URL(https / ssh / git),协议由 npm 自己挑,装到的是**默认分支当时的状态**:
   同样的命令,不同时间装出不同版本。(简写曾在本机失败过,原因不是简写本身,而是当时仓库**私有** ——
   匿名 https 读不到、又无 SSH 密钥;转为公开后这个前提就消失了。)
+  别被磁盘上的形态骗到:`pnpm add` 会把显式 `git+https://github.com/…` **规范化成 `github:` 简写**写回
+  `package.json`(committish 保留,lockfile 钉到具体提交 + 完整性哈希)。所以在 profile 里看到简写形态
+  不代表装错 —— 判据是有没有 `#v0.1.3` 这个钉子。
 - **不要动 profile 的 `cordis.patch.yml`**。本包自带 `dsh.bundle.patch`,挂进 `dsh.profile.bundles` 后
   bundle 层会自动应用它的 insert;再手写一条 `id: dsh-kachi` 的 insert 会插两次,启动即崩:
   `duplicate loader entry id: dsh-kachi`。该文件保持 `[]` 即可。
