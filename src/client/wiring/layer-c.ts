@@ -5,9 +5,9 @@
  *    初始快照的既有会话是基线,不响新建音。
  *  - 后台作业:list.jobsBySession diff → completed(前台)/failed(介入);
  *    首见即终态(基线/错过)不响,killed 静默。
- * 连接音不在本模块:0.1.2-rc.1 的连接状态是 controller 私有(单消费者
- * sinks),插件无旁听通路 —— 恢复音经 journal 的重连 replace 帧在 layer-b
- * 触发;断线警示音无通路(NOTES 记录)。
+ *  - 连接状态:ctx.connection.state(公共多消费者订阅面)→ 断线警示音 /
+ *    恢复音。旧实现走 journal 重连 replace 帧的启发式,已由本模块替换
+ *    (见「通路差异与缺口」:state 才是权威信号,replace 帧会因 seq-gap 误报)。
  */
 import type { Engine } from '../engine/audio-engine.ts'
 import { trackSessions, type SessionsLike } from './sessions-tracker.ts'
@@ -15,6 +15,42 @@ import { trackSessions, type SessionsLike } from './sessions-tracker.ts'
 export interface JobLike {
   readonly id: string
   readonly status: string
+}
+
+/** ctx.connection.state 的最小消费面(ConnectionStateSource 的结构子集)。 */
+export interface ConnectionStateLike {
+  /** 首个 outcome 之前可能为 undefined。 */
+  getSnapshot(): string | undefined
+  subscribe(listener: () => void): () => void
+}
+
+/**
+ * 连接音(SPEC §5 行 16/17):重试进入 `connecting` → 警示音;
+ * 重连成功回到 `connected` → 恢复音。
+ *
+ * 首连不是断线:`connecting` 只在「此前连上过」之后才发声,首条 `connected`
+ * 也只建立基线不响恢复音(页面加载时本就该静默)。`disconnected` 无映射
+ * (SPEC §5 未列),静默 —— 但它不重置已连上标记,故断线后的重试照常发声。
+ */
+export function wireConnection(state: ConnectionStateLike, engine: Pick<Engine, 'play'>): () => void {
+  let last: string | undefined
+  let everConnected = false
+  const push = (): void => {
+    const next = state.getSnapshot()
+    if (next === last) return // 同值重发不是状态变化
+    last = next
+    if (next === 'connecting') {
+      if (everConnected) void engine.play('reconnecting')
+      return
+    }
+    if (next === 'connected') {
+      if (everConnected) void engine.play('reconnected')
+      everConnected = true
+    }
+  }
+  const detach = state.subscribe(push)
+  push() // 首快照:建立基线,不响
+  return detach
 }
 
 /**

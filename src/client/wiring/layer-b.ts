@@ -5,6 +5,7 @@
  * append 变更逐条 seq 门控后映射发声 —— replace(基线/重连重放)与
  * prepend(翻页)只推进基线不响,杜绝页面加载与重连时的历史回放。
  * 审批请求经 journal 审计事件 approval/asked(该版本无 $on 转发)。
+ * 重连恢复音不在本模块:由 layer-c 的 ctx.connection.state 接线负责。
  */
 import type { EventId } from '../../shared/slots.ts'
 import type { Engine } from '../engine/audio-engine.ts'
@@ -83,19 +84,13 @@ export function journalToEvent(event: JournalEventLike): EventId | undefined {
 export function wireLayerB(
   sessions: SessionsLike<JournalBindingLike>,
   engine: Pick<Engine, 'play'>,
-  opts?: { now?: () => number },
 ): () => void {
-  const now = opts?.now ?? (() => Date.now())
-  // 重连恢复音去重:重连后 handleConnected 会对每个会话 resync(各自产生
-  // replace 帧),5 秒窗口内只响一次恢复音。
-  let lastReconnectedAt = -Infinity
   const cleanups = new Map<string, () => void>()
 
   const disposeTracker = trackSessions(sessions, {
     onAdded(binding) {
       const source = binding.eventSource
       let lastSeq = -1
-      let replaceCount = 0
       const push = (): void => {
         const snapshot = source.getSnapshot()
         if (snapshot === undefined) {
@@ -103,19 +98,11 @@ export function wireLayerB(
         }
         const { kind, entries } = snapshot.change
         if (kind === 'replace') {
+          // 基线(页面加载)与重连后的窗口重置:只推进 seq,不发声。
+          // 恢复音不在这里 —— 它由 layer-c 的连接状态接线负责(权威信号)。
           for (const entry of entries) {
             if (entry.type !== 'event' || entry.event === undefined) continue
             lastSeq = Math.max(lastSeq, entry.event.seq)
-          }
-          // 首个 replace 是页面加载基线;其后的 replace 来自重连恢复后的
-          // 窗口重置(handleConnected → session.resync)→ 恢复音。
-          replaceCount += 1
-          if (replaceCount >= 2) {
-            const t = now()
-            if (t - lastReconnectedAt >= 5000) {
-              lastReconnectedAt = t
-              void engine.play('reconnected')
-            }
           }
           return
         }

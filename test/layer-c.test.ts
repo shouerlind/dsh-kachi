@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { diffJobs, wireLayerC } from '../src/client/wiring/layer-c.ts'
+import { diffJobs, wireConnection, wireLayerC } from '../src/client/wiring/layer-c.ts'
 
 describe('jobs diff(工单 #12:后台作业完成/失败)', () => {
   it('基线中已终态的作业不响(页面加载不回放)', () => {
@@ -133,6 +133,95 @@ describe('C 层接线', () => {
     h.setGeneration(false)
     h.setGeneration(true)
     h.addSession('x')
+    expect(h.play).not.toHaveBeenCalled()
+  })
+})
+
+describe('连接状态接线(SPEC §5 行 16/17)', () => {
+  function makeConnection(initial?: string) {
+    let value = initial
+    const listeners = new Set<() => void>()
+    const play = vi.fn(async (_eventId: string) => {})
+    return {
+      state: {
+        getSnapshot: () => value,
+        subscribe: (l: () => void) => {
+          listeners.add(l)
+          return () => listeners.delete(l)
+        },
+      },
+      play,
+      set(next: string | undefined): void {
+        value = next
+        for (const l of [...listeners]) l()
+      },
+      listenerCount: (): number => listeners.size,
+    }
+  }
+
+  it('页面加载首连不响(基线):connecting → connected 都静默', () => {
+    const h = makeConnection()
+    const dispose = wireConnection(h.state, { play: h.play })
+    h.set('connecting')
+    h.set('connected')
+    expect(h.play).not.toHaveBeenCalled()
+    dispose()
+  })
+
+  it('首快照已是 connected 时也不响恢复音', () => {
+    const h = makeConnection('connected')
+    const dispose = wireConnection(h.state, { play: h.play })
+    expect(h.play).not.toHaveBeenCalled()
+    dispose()
+  })
+
+  it('断线重试(connecting)响警示音;重连成功(connected)响恢复音', () => {
+    const h = makeConnection('connected')
+    const dispose = wireConnection(h.state, { play: h.play })
+    h.set('connecting')
+    expect(h.play).toHaveBeenLastCalledWith('reconnecting')
+    h.set('connected')
+    expect(h.play).toHaveBeenLastCalledWith('reconnected')
+    expect(h.play).toHaveBeenCalledTimes(2)
+    dispose()
+  })
+
+  it('disconnected 无映射(静默),但不复位已连上标记:其后重试照常发声', () => {
+    const h = makeConnection('connected')
+    const dispose = wireConnection(h.state, { play: h.play })
+    h.set('disconnected')
+    expect(h.play).not.toHaveBeenCalled()
+    h.set('connecting')
+    expect(h.play).toHaveBeenCalledWith('reconnecting')
+    dispose()
+  })
+
+  it('同值重发不算状态变化,不重复发声', () => {
+    const h = makeConnection('connected')
+    const dispose = wireConnection(h.state, { play: h.play })
+    h.set('connecting')
+    h.set('connecting')
+    expect(h.play).toHaveBeenCalledTimes(1)
+    dispose()
+  })
+
+  it('断线两次各响一次(不是一次性闸)', () => {
+    const h = makeConnection('connected')
+    const dispose = wireConnection(h.state, { play: h.play })
+    h.set('connecting')
+    h.set('connected')
+    h.set('connecting')
+    h.set('connected')
+    expect(h.play.mock.calls.map((c) => c[0])).toEqual(['reconnecting', 'reconnected', 'reconnecting', 'reconnected'])
+    dispose()
+  })
+
+  it('dispose 后状态变化静默且监听器已拆除', () => {
+    const h = makeConnection('connected')
+    const dispose = wireConnection(h.state, { play: h.play })
+    dispose()
+    expect(h.listenerCount()).toBe(0)
+    h.set('connecting')
     expect(h.play).not.toHaveBeenCalled()
   })
 })

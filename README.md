@@ -8,6 +8,7 @@ dsh(deepseek harness)的音效插件:为 dsh 的所有操作与 agent 状态变�
 - **后台重要通知白名单**:权限审批请求、agent 提问、回合错误、任务完成。
 - **设置页**:分级说明、13 个槽位全包选音(默认 Switch 音 / 备选 pack)、逐项试听。
 - **全站交互音**:所有按钮/可点击项点击=按键音、悬停与键盘焦点=菜单移动音;二级面板的开启 / 选项移动 / 关闭另有专属音。经无源 DOM 委托实现,新区域零维护(见 [docs/adr/0001](docs/adr/0001-dsh-ui-sounds-dom-delegation.md))。
+- **连接状态音**:断线重试=警示音,重连成功=恢复音(以 `ctx.connection.state` 为源,不靠 journal 重放的启发式)。
 
 ## 安装(从 Release 下载,推荐)
 

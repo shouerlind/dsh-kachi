@@ -6,7 +6,7 @@
 - client bundle 外壳:`window.__ModuleLoader__.load({id:"<包名>",factory:(require)=>{var module={exports:{}};var exports=module.exports; ...; return module.exports;}})`;externals 仅基线(react、cordis、client-store、ui-slots、ui-primitives)。
 - A 层 allowlist 与 SPEC 研究一致;approval/user-questions 是 waterfall,**旁听必须 return next()**。
 - B 层:`ctx.sessions.list`(SnapshotStore,含 jobsBySession)→ `binding(id).session.open()`(幂等,拉尾页)→ `eventSource`(change: replace/prepend/append;seq 门控防历史回放)。人类输入 = `message.source.kind === 'user'`;手动取消 = `turn.end.reason.reason.kind === 'user'`(0.1.2-rc.1 的 MessageSourceMap 是 user/plugin/model/tool)。
-- C 层:`ctx.connection.generation`(getSnapshot/subscribe);jobs 经 `list.jobsBySession` diff。
+- C 层:`ctx.connection.state`(ConnectionStateSource:getSnapshot/subscribe,值 `connected|disconnected|connecting`)与 `generation`;jobs 经 `list.jobsBySession` diff。`state` 是公共多消费者订阅面 —— 断线/恢复音的唯一来源(早期「controller 私有→无通路」的结论已作废)。
 - 设置:host `ctx.settings.register(ns, schemastery schema)`;client `ctx.settingsScope.bind({namespace})`;UI 槽位 `settings.general.item`(自绘行)。
 - 资产:`/plugins` 只服务 JS。host 半 `ctx.webServer.register({kind:'prefix',path:'/dsh-kachi',handler})` 提供 WAV(已验证 200 + 穿越 404)。
 
@@ -38,8 +38,45 @@
 > `research/dsh-missing-channels.md`,分支 `research-dsh-missing-channels`)。** 三条理由都是
 > 在 `0.1.2-rc.1` 上得出的,而 profile 现在实际解析到 **`0.1.5-rc.1`**:`user-questions/request`
 > 已在转发白名单(waterfall)、`api-session/error` 已转发、`ctx.connection.state` 已是公开
-> client 服务。**缺口是「插件没接线」,不再是「dsh 无通路」**;接线前先定行为口径(见该文件 §2.2/§3)。
+> client 服务。**缺口是「插件没接线」,不再是「dsh 无通路」** —— 该缺口已于 2026-09-10 接线，
+> 见下方「三个缺口音接线」：本节四条「无通路/无审计」表述**全部作废**，保留仅作历史记录。
 > 复核也纠正了版本口径:`dsh --version` 报的是 npm 全局包,不代表运行版本。
+
+## 三个缺口音接线(2026-09-10)
+
+三条都是**死条目** —— 事件 ID 早就定义在 `src/shared/slots.ts`(槽位/分级/音量/节流齐全),
+`test/slots.test.ts` 也把它们钉进介入级白名单,但**全仓没有任何代码发射它们**。
+改动只在接线层,数据层未动:
+
+- **A 层(新模块 `src/client/wiring/layer-a.ts`)**:`ctx.remote.$on`
+  - `user-questions/request`(SPEC §5 行 3):**waterfall，必须 `return next()` 放行** ——
+    漏放行会阻断 agent 提问流，是本插件唯一会破坏 dsh 行为的接线点。
+  - `api-session/error`(SPEC §5 行 7 的 A 半):emit，无 next。行 7 本就是双源合成行
+    (`turn/end` error/max-tokens + `api-session/error`)，此前只实现了 B 半，
+    这就是它「看起来已覆盖、实际没有」的原因。
+- **C 层(`layer-c.ts` 新增 `wireConnection`)**:`ctx.connection.state.subscribe` —
+  `connecting` → 警示音、`connected` → 恢复音。语义边界:首连不是断线(只有此前连上过
+  `connecting` 才发声)，首条 `connected` 只建基线不响恢复音;`disconnected` 无映射(SPEC §5
+  未列)静默，但**不复位已连上标记**，故断线后的重试照常发声;同值重发不算状态变化。
+- **`layer-b.ts` 删掉旧恢复音路径**:原「第 2 次 replace 帧 + 5s 窗口去重」启发式整体移除,
+  replace 现在只推进 seq 基线、不发声。这是**替换而非新增** —— 两条路径并存会双响,
+  且旧路径有 seq-gap 误报史(见本节第 3 条)。`wireLayerB` 的 `opts.now` 参数随之删除。
+
+刻意**不做**的事(免得日后被当成遗漏):
+
+- **不把 `approval/request`、`api-session/added|removed` 迁到 `$on`**。它们虽同在 allowlist,
+  但现有 journal / list 路径各自带 seq 门控与初始快照基线;换路径要重建这些门控,
+  是独立工单。同一信号两条路径会双响,所以「只接缺口、不动既有」。
+- **不给 `api-session/error` 新增去重机制**。它与 `turn-end-error` / `jobs-failed` 同槽
+  (`error`),靠引擎既有的槽位节流窗(默认 200ms)防双响;若实机发现同一次失败的两路
+  信号间隔超过节流窗而双响,再议加长窗口或加跨源去重。
+
+验收:`test/layer-a.test.ts` 直接读 `@deepseek-ai/dsh-api-remotes` 的
+`API_REMOTE_FORWARDED_EVENTS` 对账**事件名与模式**(名字/模式写错即红);
+`test/layer-c.test.ts` 覆盖连接状态机(首连静默、断线发声、重连发声、disconnected 静默、
+同值不重发、dispose 拆监听)。typecheck 干净、128/128 绿、build 过。
+**待实机坐实**(静态链路完整 ≠ 运行必响,见 research 稿的保留):SPEC §9 第 8 条。
+
 
 ## 评审修复(code-review)
 

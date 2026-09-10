@@ -41,6 +41,13 @@
 
 约束备忘:`$on` 可监听集合以 `API_REMOTE_FORWARDED_EVENTS` 为上限,不改 dsh 源码不扩 allowlist(B 层已覆盖全部所需信号);emit 事件不重放,断线错过一两声可接受,不做补偿;音效插件卸载/重载时随 cordis effect 清理全部监听器与 AudioContext。
 
+接线三条硬约束(2026-09-10 定点):
+
+- **waterfall 事件必须放行**:allowlist 中 mode 为 `waterfall` 的事件(`user-questions/request`)监听器**必须 `return next()`**,漏放行会阻断 agent 的提问流(问题框弹不出来)——这是本插件唯一会破坏 dsh 行为的接线点,`test/layer-a.test.ts` 直接读 allowlist 对账模式,写错即红。
+- **一个信号只走一条路径**:A 层只接 journal / list 镜像覆盖不到的事件(`user-questions/request`、`api-session/error`);同在 allowlist 内的 `approval/request`、`api-session/added|removed` 仍走 B 层(journal `approval/asked`、seq 门控)与 C 层(`sessions.list` diff、初始快照基线)既有路径,不重复接线 —— 同一信号两条路径会双响。
+- **连接音的唯一来源是 `ctx.connection.state`**(公共多消费者订阅面),journal 的重连 replace 帧只推进 seq 基线、不发声。
+
+
 ### 3.3 播放引擎(Web Audio API)
 
 - **单例 AudioContext**:插件首次 `apply` 创建,挂 `ctx.effect` 管理;
@@ -131,6 +138,7 @@
 5. 断线重连不崩溃;插件重载/卸载后无残留监听器与音频资源(cordis disposer 全覆盖);
 6. §5.1 交互音细则逐条过:悬停逐格连响不叠加、面板打开 150ms 内抑制、未选中关闭取消音、键盘焦点移动同权(共用换行去重,不受打开抑制窗)、全站二级面板同规则接入(含 composer 之外:设置页菜单行、命令弹层);dsh 面板 aria 结构变更时插件静默不报错;
 7. 全站按钮泛化逐条过(2026-09-08):侧边栏/设置一级导航/顶栏等任意可点按钮点击=按键音、悬停与键盘焦点=菜单移动音(共用去重,同一目标不重复);会话列表行/分组行(div[role=treeitem])悬停点击同规则,行内嵌套按钮不双响;面板条目、触发器、座席按钮、自家设置行各循原路径不双响;面板在场点外按钮仅取消音,当次点击静默。
+8. 三个缺口音实机坐实(2026-09-10 接线,均需硬刷新后在前台标签页走查):agent 提问时响通知重要音**且问题框正常弹出**(waterfall 放行未被打断);断线重试响警示音、重连成功响恢复音,且恢复音不因 journal 重放双响;turn 之外的会话级错误响错误音。
 
 ## 10. 后续增强(不在首版范围)
 

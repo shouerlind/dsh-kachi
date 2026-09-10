@@ -94,7 +94,7 @@ describe('B 层 journal 接线(工单 #11)', () => {
     dispose()
   })
 
-  it('重连后的 replace 重放已响事件不双响', () => {
+  it('重连后的 replace(窗口重放)只推进基线,不发声 —— 恢复音不归本模块', () => {
     const h = makeHarness()
     const source = h.add('s1')
     const dispose = wireLayerB(h.sessions, { play: h.play })
@@ -105,44 +105,8 @@ describe('B 层 journal 接线(工单 #11)', () => {
       { type: 'tool/call', seq: 2, data: {} },
       { type: 'tool/call', seq: 3, data: {} },
     ])
-    expect(h.play).toHaveBeenCalledTimes(2) // 重连重放 → 恢复音
-    expect(h.play).toHaveBeenLastCalledWith('reconnected')
-    dispose()
-  })
-
-  it('重连恢复音在 5 秒窗口内跨会话去重(resync 风暴只响一次)', () => {
-    // 自包含最小装配(避免跨用例状态泄漏干扰)
-    let t = 1000
-    const sources = new Map<string, FakeEventSource>()
-    const bindings = new Map<string, { sessionId: string; eventSource: FakeEventSource }>()
-    const store = {
-      snapshot: { ids: [] as string[] },
-      getSnapshot(): { ids: string[] } { return this.snapshot },
-      subscribe(l: () => void): () => void { this.listeners.add(l); return () => this.listeners.delete(l) },
-      listeners: new Set<() => void>(),
-      emit(ids: string[]) { this.snapshot = { ids }; for (const l of [...this.listeners]) l() },
-    }
-    const add = (id: string): FakeEventSource => {
-      bindings.set(id, { sessionId: id, eventSource: new FakeEventSource() })
-      const s = bindings.get(id)!.eventSource
-      sources.set(id, s)
-      store.emit([...bindings.keys()])
-      return s
-    }
-    const play = vi.fn(async () => {})
-    const sessions = { list: store, binding: (id: string) => bindings.get(id) }
-    const s1 = add('s1')
-    const s2 = add('s2')
-    const dispose = wireLayerB(sessions, { play }, { now: () => t })
-    s1.change('replace', [])
-    s2.change('replace', [])
-    s1.change('replace', [{ type: 'turn/start', seq: 1, data: {} }])
-    s2.change('replace', [{ type: 'turn/start', seq: 1, data: {} }])
-    expect(play).toHaveBeenCalledWith('reconnected')
-    expect(play).toHaveBeenCalledTimes(1)
-    t += 6000
-    s1.change('replace', [{ type: 'turn/start', seq: 1, data: {} }])
-    expect(play).toHaveBeenCalledTimes(2)
+    // 重放不响、也不响恢复音(layer-b 不再持有恢复音职责)
+    expect(h.play).toHaveBeenCalledTimes(1)
     dispose()
   })
 

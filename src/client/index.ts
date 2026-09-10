@@ -1,9 +1,11 @@
 /**
  * dsh-kachi 浏览器半入口:装配播放引擎、手势解锁(含 Notification 降级)、
- * journal 接线(B 层,含审批 asked 事件)、生命周期/连接/交互音接线(C 层,
- * 交互音为 document 级 DOM 委托,ADR-0001)、设置页(SPEC §6 全部六项)。
+ * A 层转发事件接线($on)、journal 接线(B 层,含审批 asked 事件)、
+ * 生命周期/连接/交互音接线(C 层,交互音为 document 级 DOM 委托,ADR-0001)、
+ * 设置页(SPEC §6 全部六项)。
  */
 import type { Context } from '@deepseek-ai/cordis'
+import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type {} from '@deepseek-ai/dsh-client-connection/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
@@ -13,14 +15,15 @@ import { SETTINGS_NAMESPACE } from '../shared/settings.ts'
 import { toSlotFile, type SlotId } from '../shared/slots.ts'
 import { createEngine } from './engine/audio-engine.ts'
 import { installUnlock } from './engine/unlock.ts'
+import { wireLayerA } from './wiring/layer-a.ts'
 import { wireLayerB } from './wiring/layer-b.ts'
-import { wireLayerC } from './wiring/layer-c.ts'
+import { wireConnection, wireLayerC } from './wiring/layer-c.ts'
 import { wireInteraction } from './wiring/interaction.ts'
 import { bindKachiSettings } from './settings/controller.ts'
 import { applyKachiSettings, shouldPlayBoot, type EngineSettingsApi } from './settings/policy.ts'
 import { KachiGeneralRow, KachiSlotsRow, type KachiInject } from './settings/settings-ui.tsx'
 
-export const inject = ['sessions', 'settingsScope', 'slots', 'locale']
+export const inject = ['sessions', 'settingsScope', 'slots', 'locale', 'remote', 'connection']
 
 export function apply(ctx: Context): void {
   const engine = createEngine({ createContext: () => new AudioContext() })
@@ -74,9 +77,13 @@ export function apply(ctx: Context): void {
   // 行组件的 locale namespace 需先注册字典(slots.register 的 locale 契约)。
   ctx.effect(() => ctx.locale.register('dsh-kachi', { zh: { title: 'Switch 音效' }, en: { title: 'Switch sounds' } }), 'dsh-kachi: dictionaries')
 
+  ctx.effect(() => wireLayerA(ctx.remote, engine), 'dsh-kachi: remote event wiring')
+
   ctx.effect(() => wireLayerB(ctx.sessions, engine), 'dsh-kachi: journal wiring')
 
   ctx.effect(() => wireLayerC(ctx.sessions, engine), 'dsh-kachi: lifecycle wiring')
+
+  ctx.effect(() => wireConnection(ctx.connection.state, engine), 'dsh-kachi: connection wiring')
 
   // 交互音委托:composer 二级面板悬停/点击/关闭(ADR-0001)。
   ctx.effect(() => wireInteraction(window.document, engine), 'dsh-kachi: interaction wiring')
