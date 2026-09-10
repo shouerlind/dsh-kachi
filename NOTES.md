@@ -189,6 +189,14 @@ SPEC §3.2 硬约束 3 与研究稿 §2 的结论(权威信号 vs 启发式),而
   用户此前已用 `github:` 装过 `dsh-bookmate`,故预期可用;实在不成走 tgz 备用路径。
 - 需要时可**钉标签**装:`git+https://github.com/shouerlind/dsh-kachi.git#v0.1.2`。
 
+## 研究稿按惯例留在 research/* 分支(2026-09-10 复核)
+
+- 仓库先例:`research/dsh-client-events`、`research/browser-audio-playback`(均 2026-09-05,远端长期保留)。
+  `research/dsh-missing-channels`(`4f57dd4`)照此办理,**不进 main**。
+- **这些分支是存档,不是待办**:它们各自只是在 main 之上加了一个文件,合并没有任何收益。
+  交接稿曾把它描述成「落后 N 个提交、合并/变基必解冲突」,把存档误报成了 WIP ——
+  本会话据此差点把它并进 main 又删掉(已回退),下次接手**别再为它开工**。
+
 ## 评审修复(code-review)
 
 - 事件音量系数落地(play 读 mapping.volume);节流占位提前到解码前防并发双响。
