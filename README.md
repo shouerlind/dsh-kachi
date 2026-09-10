@@ -7,28 +7,34 @@ dsh(deepseek harness)的音效插件:为 dsh 的所有操作与 agent 状态变�
 - **三级通知分级**:介入级(后台标签页也响)/ 前台级(仅页面可见时响)/ 静默级(不发声)。
 - **后台重要通知白名单**:权限审批请求、agent 提问、回合错误、任务完成。
 - **设置页**:分级说明、13 个槽位全包选音(默认 Switch 音 / 备选 pack)、逐项试听。
-- **composer 交互音**:二级面板悬停 / 点击 / 关闭,经无源 DOM 委托实现(见 [docs/adr/0001](docs/adr/0001-dsh-ui-sounds-dom-delegation.md))。
+- **全站交互音**:所有按钮/可点击项点击=按键音、悬停与键盘焦点=菜单移动音;二级面板的开启 / 选项移动 / 关闭另有专属音。经无源 DOM 委托实现,新区域零维护(见 [docs/adr/0001](docs/adr/0001-dsh-ui-sounds-dom-delegation.md))。
 
 ## 安装(从 Release 下载,推荐)
 
 1. 到 [Releases](https://github.com/shouerlind/dsh-kachi/releases) 下载最新版的 `dsh-kachi-<版本>.tgz`,放到一个**不含空格**的路径(如 `~/.dsh/pkgs/`)。
-2. 编辑你的 dsh profile 的 `package.json`(`~/.dsh/profiles/<profile>/package.json`),在 `dependencies` 里加:
+2. 编辑你的 dsh profile 的 `package.json`(`~/.dsh/profiles/<profile>/package.json`),改两处:
 
-   ```json
-   "dsh-kachi": "file:<tgz 的绝对路径>"
-   ```
+   - `dependencies` 里加依赖:
 
-3. 编辑同目录的 `cordis.patch.yml`,加一条 bundle patch(已有多条 insert 就追加到列表尾部):
+     ```json
+     "dsh-kachi": "file:<tgz 的绝对路径>"
+     ```
 
-   ```yaml
-   - insert:
-       - id: dsh-kachi
-         name: dsh-kachi
-   ```
+   - `dsh.profile.bundles` 数组末尾加一项:
 
-4. 在 profile 目录里执行包管理器安装(dsh profile 默认 pnpm):`pnpm install`。
-5. 重启 dsh,打开 web 界面,点击页面任意处应听到开机音。
+     ```json
+     "dsh-kachi"
+     ```
 
+3. 在 profile 目录里执行包管理器安装(dsh profile 默认 pnpm):`pnpm install`。
+4. 重启 dsh,打开 web 界面,点击页面任意处应听到开机音。
+
+> **勿动 `cordis.patch.yml`**:本包自带 `dsh.bundle.patch`(即包内 `cordis.patch.yml`),
+> 只要挂进 `dsh.profile.bundles`,bundle 层就会自动应用它的 insert(与 `dsh-cost-meter`
+> 等同构)。profile 的 `cordis.patch.yml` 再手写一条 `id: dsh-kachi` 的 insert,
+> 等于同一 id 插两次,启动即崩:`duplicate loader entry id: dsh-kachi`。
+> 该文件保持 `[]` 即可。
+>
 > 注意:不要在含空格的路径上用 `dsh plugin --profile <p> add .` —— dsh 0.1.2-rc.1 会把路径按空格拆开,并重置 `cordis.patch.yml`。所以上面走手工步骤(细节见 [NOTES.md](NOTES.md))。
 
 ## 从源码构建
