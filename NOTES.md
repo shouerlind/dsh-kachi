@@ -138,5 +138,5 @@
 - 13 个提交推送至 origin/main(58b6b3d..9ba275f),含全站按钮泛化、会话列表
   接入、code-review 收尾。
 - `npm pack` 出 `dsh-kachi-0.1.1.tgz`(101/101 测试过);tag `v0.1.1`。
-- **待办**:GitHub Release 未建 —— 本机 `gh` 未登录,`gh auth login` 后执行
-  `gh release create v0.1.1 dsh-kachi-0.1.1.tgz --title "v0.1.1" --notes "全站按钮泛化:所有可点按钮点击=按键音、悬停/键盘焦点=菜单移动音;会话列表 treeitem 行接入;面板在场点外按钮一次按压一声"`。
+- Release 已建:<https://github.com/shouerlind/dsh-kachi/releases/tag/v0.1.1>
+  (资产 `dsh-kachi-0.1.1.tgz`;经 GH_TOKEN 一次性注入的 PAT 创建,未写入任何文件)。
