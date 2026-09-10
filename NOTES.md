@@ -41,6 +41,9 @@
   选音 onChange 自动试听候选(§14 逐项试听)。
 - own-click 接线:设置行容器 onClick → 按键音(§5 行 18)。
 - 白名单改为字面量固定清单(§CONTEXT.md「固定清单/显式决议」),不再随 level 派生。
+  _(2026-09-10 更新:集合常量已删,白名单的唯一真相回到「level === 'intervention'」
+  事件集合;「显式决议」由 test/slots.test.ts 的字面量清单钉住 —— 清单漂移测试即红。
+  见下方「架构加深落地」②。)_
 - 移除调试脚手架(KachiTestRow/trackInject/__kachi* 探针)、死代码
   (ConnectionStateMachine/isRunning/makeInjectFace)。
 
@@ -140,3 +143,75 @@
 - `npm pack` 出 `dsh-kachi-0.1.1.tgz`(101/101 测试过);tag `v0.1.1`。
 - Release 已建:<https://github.com/shouerlind/dsh-kachi/releases/tag/v0.1.1>
   (资产 `dsh-kachi-0.1.1.tgz`;经 GH_TOKEN 一次性注入的 PAT 创建,未写入任何文件)。
+
+## 文档漂移修复(2026-09-10,ask-matt 现状盘点产出)
+
+- **README「安装」步骤是错的**(高危):步骤 2 只让加 `dependencies`,漏了
+  `dsh.profile.bundles` 注册;步骤 3 教用户往 profile 的 `cordis.patch.yml`
+  手写 `id: dsh-kachi` 的 insert —— 与本文「duplicate loader entry」踩坑直接冲突
+  (包自带 `dsh.bundle.patch`,bundle 层已自动应用该 insert,顶层再写就插两次,
+  启动即崩)。已改为「依赖 + bundles 两处」+ 明确「勿动 cordis.patch.yml」。
+  证据链:dsh README.zh.md「`dsh.profile.bundles` 中各组合包的 patch → profile 自身
+  的 `cordis.patch.yml`」;本机主力 profile 的 patch 正是 `[]` + 警告注释。
+- README「功能」段同期校准:交互音已非 composer 局部,改为「全站交互音」。
+- AGENTS.md issue tracker 段仓库名漂移:`shouerlind/ns-notify` → 实际 remote
+  `shouerlind/dsh-kachi`;标题同步改 `dsh-kachi`(工作目录名 `ns-notify` 保留说明),
+  并补 `gh` 需 `GH_CONFIG_DIR` 的本机提示(免再误判「未登录」)。
+- CONTEXT.md 词表补漏(此前只在 SPEC/代码里流动的术语):音效池、单声道槽位、
+  事件音量系数、未选中关闭、语义锚点、座席、泛化目标、自家行、差分兜底;
+  原「## 词汇」拆成「音效与分级 / 节流与交互」两节,既有词条原文未动。
+- 架构巡检(`/improve-codebase-architecture`)结论:工作树干净、101/101 测试绿、
+  0 个 open issue。五个 deepening 候选(报告写在系统临时目录,未入库):
+  ①合并「会不会响」的两道闸(交互层按身份去重 + 引擎按时间去重,同一批事件两本账);
+  ②`INTERVENTION_EVENT_IDS` 是第二真相(生产只读 `mapping.level`,集合仅被测试断言);
+  ③`bridge.ts` 透传壳无测试 vs `controller.ts` 可测核心漏测;
+  ④设置形状三份拷贝(`KachiSettings`/`KachiSettingsLike`、`DEFAULT_SLOT_FILES`、`pack` 三处推导);
+  ⑤`.kachi-row` 类名哑耦合(改名不报错 → 排除静默失效 → 双响)。
+  首选 ①(顺带吃掉引擎里的 UI 词表);②近乎免费。**尚未动任何代码,等用户挑。**
+
+## 架构加深落地(2026-09-10,五候选全做;行为保持)
+
+用户决议「所有候选一条一条做」。全部为**行为保持**重构:SPEC 钉住的声音、闸窗、
+锚点、设置效果、可见字符串一字未变;typecheck 干净,测试 101 → 117 全绿,build 通过。
+
+- **① 门禁改由事件行自述**:`EventSound` 增 `throttle: 'slot' | 'event'`(新类型
+  `ThrottleKind`),引擎 `play` 改判 `mapping.throttle === 'event'` 取代
+  `INTERACTION_EVENT_IDS.has(eventId)` —— 引擎不再认事件名/UI 类别。六个交互音事件
+  (`menu-open/move/item-click/close`、`ui-click/hover`)声明 `'event'`,其余 `'slot'`。
+  `INTERACTION_EVENT_IDS` 常量删除(其成员资格已逐行落表),`INTERACTION_MIN_INTERVAL_MS`
+  保留(按事件计闸的间隔)。引擎内部 `lastInteractionAt` → `lastEventGateAt`。
+  **与报告草图的偏差(有意)**:报告画的是每事件三值 `gate`(含 monophonic),实现只给
+  两值 + 沿用槽位级 `MONOPHONIC_SLOTS` —— 因为 SPEC §4 例外① 是**按槽位授权**的
+  (「menuMove 槽内全部事件适用」),把它拆成每事件值反而会引入 13 行冗余真相。评审
+  也裁定此偏差是对 §4 例外① 的忠实实现而非缺口。
+- **② 删第二真相**:`INTERVENTION_EVENT_IDS` 删除。白名单的唯一真相 = 「`level ===
+  'intervention'` 的事件集合」(生产本就只读 `level`);test/slots.test.ts 改从 level
+  派生后再与字面量清单比对,清单作为「变更需显式决议」的规格锚留下。
+- **③ 设置域责任归位**:`src/client/settings/bridge.ts` 删除,其 12 行翻译内联进组合根
+  `client/index.ts`(适配面本就该在缝上);新增 `test/controller.test.ts` 11 个接口级
+  测试(注入假 scope:默认值派生、脏数据兜底、乐观写入、host 回流收敛、退订、set 失败不抛)。
+  此前「可测却漏测的可测核心」缺口补上。
+- **④ 设置形状单一来源**:`KachiSettingsLike` 由 `Pick<KachiSettings, ...>` 派生(字段改名
+  会编译报错);新增 `SETTINGS_CONSUMPTION`(`Record<keyof KachiSettings, string>`,
+  穷尽)—— 给 `KachiSettings` 加字段而不登记消费方即编译红,逼出「新设置有没有接线」的决议;
+  配套两条测试(登记覆盖全部字段 / 登记为 apply 的字段确实写进引擎)。
+  `DEFAULT_SLOT_FILES` 派生副本删除(JSX 直读 `DEFAULT_SLOT_SOUNDS`)。
+  `SlotFile` 移到 `shared/slots.ts`,`toSlotFile(file)` 成为 pack 归属的**唯一判定点**;
+  `settings-ui` 的 `preview(file, pack)` 收窄为 `preview(file)` —— 视图不再知道池的布局。
+- **⑤ 行类名单一出处**:新增 `src/client/settings/row.ts`(`OWN_ROW_CLASS` +
+  由它派生的 `OWN_ROW_SELECTOR`);`settings-ui` 的样式与两处 `className`、`interaction`
+  的排除锚全部同源引用,`interaction.ts` 保持 re-export(对外面不变);加测试断言二者同源。
+  类名字面量 `'kachi-row'` 全仓仅剩一处(定义处)。
+
+### 两轴 code-review 结论(HEAD 6e2faca → 工作树)
+
+- **Standards 轴**:无硬违规。唯一判断项:注释新用「门禁」一词而 CONTEXT.md 未定义
+  (仅「节流」「例外①/②」)—— 轻度词汇漂移,已在 CONTEXT 交互词条体系内可读,暂不改。
+  确认 `SETTINGS_CONSUMPTION` **不是** Speculative Generality(有测试驱动、有编译期守卫)。
+- **Spec 轴**:五候选逐一交付,行为保持成立(闸窗/锚点/音量/可见字符串均未变);README/
+  CONTEXT/AGENTS/NOTES 的文档改动属范围外但行为中性。
+- **误报澄清**:Spec 轴称「`menu-move`/`ui-hover` 走按事件闸 → 绕过 menuMove 槽单声道打断」。
+  不实 —— 打断在闸分支**之后**(`audio-engine.ts` 单声道段),与门禁种类无关;
+  既有测试「新响打断上一响:单声道不叠加」用的正是 `menu-move` 且断言旧源 stopped,
+  本次运行仍绿,即证据。
+- 未提交、未推;`lib/` 已重建(`npm run build`)。
