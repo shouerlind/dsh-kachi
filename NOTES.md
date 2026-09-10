@@ -98,7 +98,14 @@
   **不加 `prepare` 是刻意的** —— 安装期脚本可能被启动器拦掉,或在 `--omit=dev` 下因缺 devDeps
   直接失败,两条都等于装不上;把产物提交进 git 则两种情况都能装。
 - 代价:**改了 `src/` 必须 `npm run build` 并把 `lib/` 一起提交**,否则发出去的是旧产物
-  (`.gitignore` 里写了这条注释)。
+  (`.gitignore` 里写了这条注释)。为此加了闸门 **`npm run check:dist`**:重建后把「工作树 ≠ 索引」
+  与「未入库的新产物」都对账出来,不一致即红并打印该 add 哪些文件。提交/发版前跑它。
+- **sourcemap 不入库**(`lib/*.map` 进 `.gitignore`)—— 踩到的陷阱:map 内嵌源码原文,而本机
+  `core.autocrlf=true`,`git checkout` 落盘的是 CRLF;esbuild 读**磁盘原文**,把 CRLF 一起嵌进
+  `sourcesContent`,于是「已提交的 map」与「任何一次重建出的 map」**永远不同**;更糟的是
+  `git status` 对源码判定**干净**(git 比对前会把 CRLF 归一化),从源码侧查不出原因。
+  实测:map 内嵌的 `slots.ts` 含 CR、HEAD 版本不含,差 204 字节 = 该文件行数 —— 纯环境相关字节,
+  不是真漂移。JS 产物不受影响(`lib/index.js`、`lib/client.js` 与 HEAD 逐字节相同)。
 - `src/client/pack-manifest.json` 仍不入库:它被 `settings-ui.tsx` import,已内联进 `lib/client.js`,
   运行时不从包里读;`files` 里原有那条已删(git 安装时该文件不存在,留着是空指针式的隐患)。
 

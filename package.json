@@ -28,6 +28,7 @@
   ],
   "scripts": {
     "build": "node scripts/gen-pack-manifest.mjs && node scripts/build.mjs",
+    "check:dist": "node scripts/check-dist.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"

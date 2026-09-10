@@ -32,7 +32,7 @@ dsh(deepseek harness)的音效插件:为 dsh 的所有操作与 agent 状态变�
 也可以让 dsh 启动器代劳:在插件面板里填 `github:shouerlind/dsh-kachi` 安装。**只有 registry /
 git 来源的插件能被启动器识别与迁移**,`file:` / `link:` 的本地包装不上这个能力。
 
-> **产物已入库**:`lib/` 随源码提交,所以 git 依赖装出来就是可用的(不依赖安装期构建脚本)。
+> **产物已入库**:`lib/` 的 JS 产物随源码提交,所以 git 依赖装出来就是可用的(不依赖安装期构建脚本)。
 
 <details>
 <summary>备用:从 Release 的 tgz 安装</summary>
@@ -60,8 +60,9 @@ git 来源的插件能被启动器识别与迁移**,`file:` / `link:` 的本地�
 git clone https://github.com/shouerlind/dsh-kachi.git
 cd dsh-kachi
 npm install
-npm run build   # 产物 lib/index.js(host 半)+ lib/client.js(浏览器半)
-npm pack        # 得到 dsh-kachi-<版本>.tgz,按上面「安装」步骤装进 profile
+npm run build      # 产物 lib/index.js(host 半)+ lib/client.js(浏览器半)
+npm run check:dist # 改了源码后自查:产物是否与源码一致(产物已入库)
+npm pack           # 得到 dsh-kachi-<版本>.tgz,按上面「安装」步骤装进 profile
 ```
 
 开发期热更:`file:` 依赖换成 `link:` 协议指向本仓库,重建 `lib/` 后 profile 直接可见(详见 [NOTES.md](NOTES.md))。
