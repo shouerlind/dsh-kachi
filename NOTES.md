@@ -174,7 +174,7 @@
 用户决议「所有候选一条一条做」。全部为**行为保持**重构:SPEC 钉住的声音、闸窗、
 锚点、设置效果、可见字符串一字未变;typecheck 干净,测试 101 → 117 全绿,build 通过。
 
-- **① 门禁改由事件行自述**:`EventSound` 增 `throttle: 'slot' | 'event'`(新类型
+- **① 节流规则改由事件行自述**:`EventSound` 增 `throttle: 'slot' | 'event'`(新类型
   `ThrottleKind`),引擎 `play` 改判 `mapping.throttle === 'event'` 取代
   `INTERACTION_EVENT_IDS.has(eventId)` —— 引擎不再认事件名/UI 类别。六个交互音事件
   (`menu-open/move/item-click/close`、`ui-click/hover`)声明 `'event'`,其余 `'slot'`。
@@ -205,13 +205,14 @@
 
 ### 两轴 code-review 结论(HEAD 6e2faca → 工作树)
 
-- **Standards 轴**:无硬违规。唯一判断项:注释新用「门禁」一词而 CONTEXT.md 未定义
-  (仅「节流」「例外①/②」)—— 轻度词汇漂移,已在 CONTEXT 交互词条体系内可读,暂不改。
+- **Standards 轴**:无硬违规。唯一判断项:注释新用「门禁」一词而 CONTEXT.md 未定义 ——
+  已按词表纪律处理:**不收词**,改回既有词「节流/节流规则」(给同一概念再立近义名正是
+  词表要防的漂移);`slots.ts`、`audio-engine.ts`、`slots.test.ts` 与该段的措辞已统一。
   确认 `SETTINGS_CONSUMPTION` **不是** Speculative Generality(有测试驱动、有编译期守卫)。
 - **Spec 轴**:五候选逐一交付,行为保持成立(闸窗/锚点/音量/可见字符串均未变);README/
   CONTEXT/AGENTS/NOTES 的文档改动属范围外但行为中性。
 - **误报澄清**:Spec 轴称「`menu-move`/`ui-hover` 走按事件闸 → 绕过 menuMove 槽单声道打断」。
-  不实 —— 打断在闸分支**之后**(`audio-engine.ts` 单声道段),与门禁种类无关;
+  不实 —— 打断在闸分支**之后**(`audio-engine.ts` 单声道段),与节流规则无关;
   既有测试「新响打断上一响:单声道不叠加」用的正是 `menu-move` 且断言旧源 stopped,
   本次运行仍绿,即证据。
 - 未提交、未推;`lib/` 已重建(`npm run build`)。

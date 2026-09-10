@@ -79,7 +79,7 @@ describe('事件 → 音效映射(SPEC §5)', () => {
     expect(EVENT_SOUNDS['jobs-failed']).toMatchObject({ slot: 'error', level: 'intervention', volume: 100 })
   })
 
-  it('所有事件的音量都在 1-100,槽位都在槽位表内,且都声明了门禁', () => {
+  it('所有事件的音量都在 1-100,槽位都在槽位表内,且都声明了节流规则', () => {
     for (const [id, mapping] of Object.entries(EVENT_SOUNDS)) {
       expect(SLOT_IDS, `event ${id}`).toContain(mapping.slot)
       expect(mapping.volume, `event ${id}`).toBeGreaterThanOrEqual(1)
@@ -90,7 +90,7 @@ describe('事件 → 音效映射(SPEC §5)', () => {
   })
 
   it('按事件计闸的清单固定为交互音六事件(SPEC §4 例外②)', () => {
-    // 规格锚:门禁是事件行声明,引擎不认事件名;改这张清单须显式决议。
+    // 规格锚:节流规则是事件行声明,引擎不认事件名;改这张清单须显式决议。
     const perEvent = Object.entries(EVENT_SOUNDS)
       .filter(([, m]) => m.throttle === 'event')
       .map(([id]) => id)

@@ -176,7 +176,7 @@ export function createEngine(options: EngineOptions): Engine {
       if (!mapping) return
       // 后台策略:hidden 仅介入级(SPEC §4 白名单)。
       if (visibility() === 'hidden' && mapping.level !== 'intervention') return
-      // 节流门禁由事件行自述(mapping.throttle,SPEC §4):闸的种类不在引擎里
+      // 节流规则由事件行自述(mapping.throttle,SPEC §4):走哪条规则不在引擎里
       // 认事件名。闸后立即占位防并发同槽在解码窗内双响。三类走法:
       //  - throttle==='event':按事件各自 50ms 计闸,不受节流窗影响(例外②);
       //  - 单声道槽位:固定 50ms 最小间隔替代节流窗(例外①);

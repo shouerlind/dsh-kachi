@@ -94,7 +94,7 @@ export const EVENT_IDS = [
 export type EventId = (typeof EVENT_IDS)[number]
 
 /**
- * 节流门禁种类(SPEC §4):事件行自述它走哪条闸,引擎不再按事件名分类。
+ * 节流规则种类(SPEC §4):事件行自述它走哪条规则,引擎不再按事件名分类。
  *  - `slot`:按槽位去重,窗口 = 节流窗(setThrottleMs 可调)。
  *  - `event`:按事件各自 50ms 计闸,不受节流窗影响(SPEC §4 例外②:确认槽
  *    与 tool/result 同槽,槽位去重会吞掉快速连点面板的重开确认音)。
@@ -110,7 +110,7 @@ export interface EventSound {
 }
 
 /**
- * 事件 → 槽位/分级/事件音量/节流门禁。音量承载约定(单一承载层):
+ * 事件 → 槽位/分级/事件音量/节流规则。音量承载约定(单一承载层):
  * 槽位默认音量承载 SPEC §5 音量列的槽位主档位;事件 volume 仅作
  * 「同槽低于主档」的线性微降(如 tool-result-fail 70 / jobs-completed 60),
  * 与主档一致时恒为 100,不得与槽位叠乘。
