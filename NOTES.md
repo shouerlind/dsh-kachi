@@ -34,6 +34,13 @@
 - **api-session/error**:无转发、无 journal 审计;错误面由 turn-end-error + jobs-failed 覆盖。
 - **事件音量系数**(§5 音量列):per-shot GainNode 线性系数 ×(槽位²×总²平方映射)。
 
+> **⚠️ 本节三条「无通路」的理由已过时(2026-09-10 复核,详见
+> `research/dsh-missing-channels.md`,分支 `research-dsh-missing-channels`)。** 三条理由都是
+> 在 `0.1.2-rc.1` 上得出的,而 profile 现在实际解析到 **`0.1.5-rc.1`**:`user-questions/request`
+> 已在转发白名单(waterfall)、`api-session/error` 已转发、`ctx.connection.state` 已是公开
+> client 服务。**缺口是「插件没接线」,不再是「dsh 无通路」**;接线前先定行为口径(见该文件 §2.2/§3)。
+> 复核也纠正了版本口径:`dsh --version` 报的是 npm 全局包,不代表运行版本。
+
 ## 评审修复(code-review)
 
 - 事件音量系数落地(play 读 mapping.volume);节流占位提前到解码前防并发双响。
