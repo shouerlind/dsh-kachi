@@ -36,6 +36,8 @@ export class FakeAudioContext {
   resumeResult: 'ok' | 'fail' = 'ok'
   readonly sources: FakeSource[] = []
   readonly gains: FakeGain[] = []
+  /** 交给 decodeAudioData 的字节(封套往返断言用)。 */
+  readonly decoded: ArrayBuffer[] = []
 
   async resume(): Promise<void> {
     this.resumeCalls++
@@ -43,7 +45,8 @@ export class FakeAudioContext {
     this.state = 'running'
   }
 
-  async decodeAudioData(_data: ArrayBuffer): Promise<AudioBuffer> {
+  async decodeAudioData(data: ArrayBuffer): Promise<AudioBuffer> {
+    this.decoded.push(data)
     return { duration: 0.1 } as unknown as AudioBuffer
   }
 
@@ -62,4 +65,13 @@ export class FakeAudioContext {
   async close(): Promise<void> {
     this.state = 'closed'
   }
+}
+
+/**
+ * 音效端点 fake:返回合法 base64 封套(4 字节 0x00 → `AAAAAA==`)。
+ * 引擎只把解出的字节交给 decodeAudioData,内容无所谓;这里保证封套可解码。
+ * 计数/自定义行为的需求直接 `return okSoundFetcher()` 包一层。
+ */
+export async function okSoundFetcher(): Promise<{ ok: boolean; json(): Promise<unknown> }> {
+  return { ok: true, json: async () => ({ b64: 'AAAAAA==' }) }
 }

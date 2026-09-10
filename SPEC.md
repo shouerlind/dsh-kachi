@@ -28,7 +28,7 @@
 
 - 包根 `package.json`:`"dsh": { "client": { "platform": "web", "inject": [...] } }`,构建产物挂 `exports["./client"]` → `lib/client.js`;
 - 插件体:`export const inject = [...]` + `export function apply(ctx)`;
-- 安装:开发期 `dsh plugin --profile web add .`(仓库目录内执行);稳定后 `dsh plugin --profile web add github:shouerlind/ns-notify`;
+- 安装:开发期 `dsh plugin --profile web add .`(仓库目录内执行);稳定后经 git 依赖装,权威步骤见 README「安装」节(`github:` 简写在无 SSH 密钥的机器上不可用);
 - profile:主用 `web` profile 一份(`~/.dsh/profiles/web`);profiles 与 dsh 版本解耦,旧版 dsh 加载不了就旧版不装。
 
 ### 3.2 事件接线(三层,均已在工单 #2 研究中验证可行)
@@ -54,6 +54,7 @@
 - **解锁流程**:首次用户手势(pointerdown/keydown)调用 `resume()`;解锁前排队事件丢弃不报错;`resume` 失败(NotAllowedError/suspended)降级为 Notification API 系统通知并提示点击页面(Notification `sound` 自定义音效不可靠,仅兜底);
 - **结构**:所有音效文件启动时 `decodeAudioData` 预解码为 AudioBuffer 缓存;每次播放新建 AudioBufferSourceNode(天然重叠并发);母线一个 master GainNode 控总音量(滑条平方映射),每槽位独立 GainNode 控该槽位音量;
 - **后台策略**:Page Visibility API 读 `visibilityState`——前台全响;后台(hidden)仅播白名单(介入级),其余静默。
+- **传输(2026-09-10 修订,IDM 兼容)**:音效经 host 半的 `/dsh-kachi/sound?file=<相对路径>` 端点以 **JSON 封套**(`{ b64 }`)取得,客户端 base64 解回字节再交给 `decodeAudioData`。不用 `.wav` 静态路径、不用 `audio/*` 响应头、body 也不以 RIFF 魔数开头——IDM 等下载管理器正靠这些标记认领下载,会让每次发声都触发下载。代价:传输量 +33%(一次性启动成本)。理由与取舍见 `src/shared/sound-envelope.ts`;**旧 `/dsh-kachi/sounds/*.wav` 路由已删除**。
 
 ## 4. 通知分级与播放策略
 

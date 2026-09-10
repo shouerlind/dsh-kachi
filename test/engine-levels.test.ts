@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createEngine, type AudioContextLike, type SourceNodeLike } from '../src/client/engine/audio-engine.ts'
-import { FakeAudioContext, FakeGain, FakeSource } from './fakes.ts'
+import { FakeAudioContext, FakeGain, FakeSource, okSoundFetcher } from './fakes.ts'
 
 export { FakeAudioContext, FakeGain, FakeSource }
 
@@ -8,7 +8,7 @@ function makeEngine(ctx: FakeAudioContext, opts?: { visibility?: 'visible' | 'hi
   return createEngine({
     createContext: () => ctx as unknown as AudioContextLike,
     audioBase: '/test-assets',
-    fetchImpl: async () => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(8) }),
+    fetchImpl: okSoundFetcher,
     visibility: () => opts?.visibility ?? 'visible',
   })
 }
@@ -85,7 +85,7 @@ describe('引擎完整化:两级 GainNode 总线(工单 #10)', () => {
       audioBase: '/t',
       fetchImpl: async () => {
         fetched++
-        return { ok: true, arrayBuffer: async () => new ArrayBuffer(8) }
+        return okSoundFetcher()
       },
     })
     // 预解码是后台任务,稍等其完成

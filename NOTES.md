@@ -379,3 +379,38 @@ SPEC §3.2 硬约束 3 与研究稿 §2 的结论(权威信号 vs 启发式),而
   既有测试「新响打断上一响:单声道不叠加」用的正是 `menu-move` 且断言旧源 stopped,
   本次运行仍绿,即证据。
 - 未提交、未推;`lib/` 已重建(`npm run build`)。
+
+## 0.1.3:IDM 拦截音效请求的修复(2026-09-10)
+
+**症状**:装了 IDM(Internet Download Manager)的机器上,dsh 每次发声都触发下载。
+插件启动即预解码 13 个默认槽,页面一加载连撞 13 次;设置页逐项试听再撞一串。
+
+**根因**:旧 `/dsh-kachi/sounds/*.wav` 静态路由同时暴露两个 IDM 赖以认领下载的标记 ——
+URL 里的 `.wav` 扩展名,与 `content-type: audio/wav` 响应头。
+
+**修复**(JSON 封套,定义在 `src/shared/sound-envelope.ts`):
+
+- host:`/dsh-kachi/sound?file=<相对路径>` 返回 `application/json` 的 `{ b64 }`;
+  池归属编码进 `file` 参数(`pack/<name>.wav` 与裸 `<name>.wav`),白名单仍是
+  `host/sound-files.ts` 的严格文件名正则;缓存头与 HEAD/404 语义与旧路由同级。
+- client:引擎取 `json()` 而非 `arrayBuffer()`,base64 解回字节再 `decodeAudioData`;
+  封套缺失 / 非法 base64 / JSON 解析失败一律无声丢弃,不报错。
+- **旧 `.wav` 静态路由已删除**(客户端本无消费者),现在非 `/dsh-kachi/sound` 一律 404。
+
+**为什么是 JSON 而不是「二进制 + application/octet-stream」**:后者只藏起扩展名与响应头,
+字节流开头仍是 `RIFF....WAVE`,挡不住按内容嗅探的兜底。代价是传输量 +33%(13 个默认槽
+0.87 MB → ≈1.16 MB,一次性启动成本;单文件最大 ≈1.05 MB → ≈1.4 MB)。
+
+**顺带修掉一个被测试盲区掩盖的坑**:`SOUND_ROOT` 原本只写死产物布局
+(`../assets/sounds/`,从 `lib/index.js` 出发正确),源码直跑时解析到不存在的
+`src/assets/sounds` → 端点永远 404。而 `test/` 里**没有任何测试碰过 `webServer.register`
+的处理函数**(只有 `resolveSoundFile` 纯函数测试),所以这个坑一直没人发现。现在
+`SOUND_ROOT` 两种布局都认,并新增 `test/host-route.test.ts`。
+
+**测试面**:新增 `test/sound-envelope.test.ts`(与 Node Buffer 逐字节对账)、
+`test/host-route.test.ts`(9 条,真打到磁盘资产:字节往返对账、路径安全、旧路由已死、
+IDM 三个标记都不在);`sound-files` / `slots` / `engine` 三处断言随路径形态更新;测试替身
+新增 `okSoundFetcher`(`test/fakes.ts`),6 处内联 stub 收敛到它。
+
+**接口变更记录**:`SoundFetcher` 由 `{ ok, arrayBuffer() }` 改为 `{ ok, json() }` ——
+属测试面共享的最小结构面,非公开 API。`npm run typecheck` 干净,`npm test` 154/154 绿。

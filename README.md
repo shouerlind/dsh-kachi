@@ -9,13 +9,14 @@ dsh(deepseek harness)的音效插件:为 dsh 的所有操作与 agent 状态变�
 - **设置页**:分级说明、13 个槽位全包选音(默认 Switch 音 / 备选 pack)、逐项试听。
 - **全站交互音**:所有按钮/可点击项点击=按键音、悬停与键盘焦点=菜单移动音;二级面板的开启 / 选项移动 / 关闭另有专属音。经无源 DOM 委托实现,新区域零维护(见 [docs/adr/0001](docs/adr/0001-dsh-ui-sounds-dom-delegation.md))。
 - **连接状态音**:断线重试=警示音,重连成功=恢复音(以 `ctx.connection.state` 为源,不靠 journal 重放的启发式)。
+- **下载管理器兼容**:音效经 `/dsh-kachi/sound` 的 JSON 封套接口传输——没有 `.wav` 路径、没有 `audio/*` 响应头、响应体也不以 RIFF 魔数开头,IDM 等下载管理器无从认领下载(旧 `.wav` 静态路由已删除)。代价是传输量 +33%,只在启动预解码那一次。
 
 ## 安装(经 GitHub,推荐 —— 启动器可迁移)
 
 在 profile 目录下一条命令(profile 默认用 pnpm;`pnpm add` 会替你写 `dependencies`):
 
 ```sh
-pnpm add "git+https://github.com/shouerlind/dsh-kachi.git#v0.1.2"
+pnpm add "git+https://github.com/shouerlind/dsh-kachi.git#v0.1.3"
 ```
 
 **再往同一个 `package.json` 的 `dsh.profile.bundles` 数组里加一行** `"dsh-kachi"`,然后重启 dsh。

@@ -108,8 +108,17 @@ describe('事件 → 音效映射(SPEC §5)', () => {
 })
 
 describe('soundUrl', () => {
-  it('默认文件走根目录,pack 文件走 pack 子目录', () => {
-    expect(soundUrl('boot.wav')).toBe('/dsh-kachi/sounds/boot.wav')
-    expect(soundUrl('SeNewsBad.wav', { pack: true })).toBe('/dsh-kachi/sounds/pack/SeNewsBad.wav')
+  it('默认文件与 pack 文件都走 JSON 封套端点:无 .wav 路径、无 audio 类型可被下载管理器识别', () => {
+    expect(soundUrl('boot.wav')).toBe('/dsh-kachi/sound?file=boot.wav')
+    expect(soundUrl('SeNewsBad.wav', { pack: true })).toBe('/dsh-kachi/sound?file=pack%2FSeNewsBad.wav')
+  })
+
+  it('自定义 base 只换前缀,路径形态不变', () => {
+    expect(soundUrl('boot.wav', { base: '/t' })).toBe('/t/sound?file=boot.wav')
+  })
+
+  it('文件名进 query 时被转义(空格/加号不得逃逸出参数值)', () => {
+    expect(soundUrl('a b.wav')).toBe('/dsh-kachi/sound?file=a%20b.wav')
+    expect(soundUrl('a+b.wav')).toBe('/dsh-kachi/sound?file=a%2Bb.wav')
   })
 })

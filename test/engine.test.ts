@@ -1,12 +1,17 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createEngine, type AudioContextLike } from '../src/client/engine/audio-engine.ts'
-import { FakeAudioContext } from './fakes.ts'
+import {
+  createEngine,
+  type AudioContextLike,
+  type SoundFetcher,
+} from '../src/client/engine/audio-engine.ts'
+import { encodeBase64 } from '../src/shared/sound-envelope.ts'
+import { FakeAudioContext, okSoundFetcher } from './fakes.ts'
 
 function makeEngine(ctx: FakeAudioContext) {
   return createEngine({
     createContext: () => ctx as unknown as AudioContextLike,
     audioBase: '/test-assets',
-    fetchImpl: async () => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(8) }),
+    fetchImpl: okSoundFetcher,
     visibility: () => 'visible',
   })
 }
@@ -38,7 +43,7 @@ describe('播放引擎(工单 #9 最小形态)', () => {
     const engine = createEngine({
       createContext: () => ctx as unknown as AudioContextLike,
       audioBase: '/test-assets',
-      fetchImpl: async () => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(8) }),
+      fetchImpl: okSoundFetcher,
       visibility: () => 'visible',
       now: () => t,
     })
@@ -68,6 +73,107 @@ describe('播放引擎(工单 #9 最小形态)', () => {
     await expect(engine.unlock()).resolves.toBe(false)
     await engine.play('boot')
     expect(ctx.sources).toHaveLength(0)
+    engine.dispose()
+  })
+})
+
+/** IDM 兼容改动后新增:音效走 JSON 封套,失败路径一律无声丢弃、不报错。 */
+describe('音效封套(IDM 兼容)', () => {
+  function engineWithFetcher(ctx: FakeAudioContext, fetchImpl: SoundFetcher) {
+    return createEngine({
+      createContext: () => ctx as unknown as AudioContextLike,
+      audioBase: '/test-assets',
+      fetchImpl,
+      visibility: () => 'visible',
+    })
+  }
+
+  it('请求 URL 不再含 .wav 路径、不再是音频资源形态', async () => {
+    const ctx = new FakeAudioContext()
+    const seen: string[] = []
+    const engine = engineWithFetcher(ctx, async (url) => {
+      seen.push(url)
+      return okSoundFetcher()
+    })
+    await engine.unlock()
+    await engine.play('boot')
+    expect(seen.length).toBeGreaterThan(0)
+    for (const url of seen) {
+      expect(url).toContain('/test-assets/sound?file=')
+      expect(url).not.toContain('/sounds/')
+    }
+    engine.dispose()
+  })
+
+  it('HTTP 非 2xx:不建 source', async () => {
+    const ctx = new FakeAudioContext()
+    const engine = engineWithFetcher(ctx, async () => ({ ok: false, json: async () => ({ b64: 'AAAAAA==' }) }))
+    await engine.unlock()
+    await engine.play('boot')
+    expect(ctx.sources).toHaveLength(0)
+    engine.dispose()
+  })
+
+  it('封套缺 b64 字段:不建 source', async () => {
+    const ctx = new FakeAudioContext()
+    const engine = engineWithFetcher(ctx, async () => ({ ok: true, json: async () => ({}) }))
+    await engine.unlock()
+    await engine.play('boot')
+    expect(ctx.sources).toHaveLength(0)
+    engine.dispose()
+  })
+
+  it('b64 不是字符串:不建 source', async () => {
+    const ctx = new FakeAudioContext()
+    const engine = engineWithFetcher(ctx, async () => ({ ok: true, json: async () => ({ b64: 42 }) }))
+    await engine.unlock()
+    await engine.play('boot')
+    expect(ctx.sources).toHaveLength(0)
+    engine.dispose()
+  })
+
+  it('body 不是对象:不建 source,不抛错', async () => {
+    const ctx = new FakeAudioContext()
+    const engine = engineWithFetcher(ctx, async () => ({ ok: true, json: async () => null }))
+    await engine.unlock()
+    await expect(engine.play('boot')).resolves.toBeUndefined()
+    expect(ctx.sources).toHaveLength(0)
+    engine.dispose()
+  })
+
+  it('base64 含非法字符:不建 source,不抛错', async () => {
+    const ctx = new FakeAudioContext()
+    const engine = engineWithFetcher(ctx, async () => ({ ok: true, json: async () => ({ b64: '!!!!' }) }))
+    await engine.unlock()
+    await expect(engine.play('boot')).resolves.toBeUndefined()
+    expect(ctx.sources).toHaveLength(0)
+    engine.dispose()
+  })
+
+  it('JSON 解析失败(响应不是 JSON):不建 source,不抛错', async () => {
+    const ctx = new FakeAudioContext()
+    const engine = engineWithFetcher(ctx, async () => ({
+      ok: true,
+      json: async () => {
+        throw new SyntaxError('Unexpected token < in JSON')
+      },
+    }))
+    await engine.unlock()
+    await expect(engine.play('boot')).resolves.toBeUndefined()
+    expect(ctx.sources).toHaveLength(0)
+    engine.dispose()
+  })
+
+  it('封套往返:base64 解出的字节原样交给 decodeAudioData', async () => {
+    const ctx = new FakeAudioContext()
+    const wav = new Uint8Array([0x52, 0x49, 0x46, 0x46, 0x00, 0x01, 0x02, 0x03]) // 'RIFF' + 4
+    const engine = engineWithFetcher(ctx, async () => ({ ok: true, json: async () => ({ b64: encodeBase64(wav) }) }))
+    await engine.unlock()
+    await engine.play('boot')
+    expect(ctx.decoded.length).toBeGreaterThan(0)
+    for (const buf of ctx.decoded) {
+      expect(Array.from(new Uint8Array(buf))).toEqual(Array.from(wav))
+    }
     engine.dispose()
   })
 })

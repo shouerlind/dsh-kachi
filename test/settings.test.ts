@@ -3,7 +3,7 @@ import { createEngine, type AudioContextLike, volumeGain } from '../src/client/e
 import { applyKachiSettings, SETTINGS_CONSUMPTION, shouldPlayBoot } from '../src/client/settings/policy.ts'
 import { DEFAULT_SETTINGS, SETTINGS_NAMESPACE } from '../src/shared/settings.ts'
 import { DEFAULT_SLOT_SOUNDS, toSlotFile } from '../src/shared/slots.ts'
-import { FakeAudioContext, FakeGain, FakeSource } from './fakes.ts'
+import { FakeAudioContext, FakeGain, FakeSource, okSoundFetcher } from './fakes.ts'
 
 describe('共享设置形状(工单 #13/#14)', () => {
   it('namespace 与默认值与 SPEC §5/§6 一致', () => {
@@ -24,7 +24,7 @@ describe('引擎:总开关与试听(工单 #13/#14)', () => {
     return createEngine({
       createContext: () => ctx as unknown as AudioContextLike,
       audioBase: '/t',
-      fetchImpl: async () => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(8) }),
+      fetchImpl: okSoundFetcher,
       visibility: () => 'visible',
       now: () => 0,
     })
@@ -49,7 +49,7 @@ describe('引擎:总开关与试听(工单 #13/#14)', () => {
     const engine = createEngine({
       createContext: () => ctx as unknown as AudioContextLike,
       audioBase: '/t',
-      fetchImpl: async () => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(8) }),
+      fetchImpl: okSoundFetcher,
       visibility: () => 'hidden',
       now: () => t,
     })

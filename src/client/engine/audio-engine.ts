@@ -15,6 +15,7 @@ import {
   type SlotFile,
   type SlotId,
 } from '../../shared/slots.ts'
+import { decodeBase64, type SoundEnvelope } from '../../shared/sound-envelope.ts'
 
 /** 播放源节点最小结构(真 AudioBufferSourceNode 结构兼容;测试塞 fake)。 */
 export interface SourceNodeLike {
@@ -41,9 +42,13 @@ export interface AudioContextLike {
   createGain(): GainNodeLike
 }
 
-/** 音效抓取器:真 fetch 的 Response 结构兼容此最小面;测试塞 fake。 */
+/**
+ * 音效抓取器:真 fetch 的 Response 结构兼容此最小面;测试塞 fake。
+ * 读 `json()` 而非 `arrayBuffer()` —— 音效以 JSON 封套传输,响应体不再是音频
+ * (见 shared/sound-envelope.ts)。
+ */
 export interface SoundFetcher {
-  (url: string): Promise<{ ok: boolean; arrayBuffer(): Promise<ArrayBuffer> }>
+  (url: string): Promise<{ ok: boolean; json(): Promise<unknown> }>
 }
 
 export interface EngineOptions {
@@ -143,8 +148,11 @@ export function createEngine(options: EngineOptions): Engine {
     try {
       const data = await fetchImpl(soundUrl(slotFile.file, { pack: slotFile.pack, base: audioBase }))
       if (!data.ok) return undefined
-      const bytes = await data.arrayBuffer()
-      const buffer = await ctx.decodeAudioData(bytes)
+      const envelope = (await data.json()) as Partial<SoundEnvelope> | null
+      if (typeof envelope?.b64 !== 'string') return undefined
+      // decodeBase64 每次返回新分配的整段 Uint8Array(无偏移、不与其它视图共享),
+      // 故这里的收窄是精确的:其 buffer 就是 ArrayBuffer。
+      const buffer = await ctx.decodeAudioData(decodeBase64(envelope.b64).buffer as ArrayBuffer)
       if (closed) return undefined
       buffers.set(key, buffer)
       return buffer

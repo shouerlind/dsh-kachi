@@ -1,6 +1,6 @@
 {
   "name": "dsh-kachi",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "deepseek harness 音效插件:为 dsh 全部操作与 agent 状态变化播放 Nintendo Switch 系统同款音效(「事事有回应」)。含三级通知分级、后台白名单、设置页与全包选音。",
   "type": "module",
   "main": "lib/index.js",

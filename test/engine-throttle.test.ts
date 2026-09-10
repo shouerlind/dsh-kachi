@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { createEngine, type AudioContextLike } from '../src/client/engine/audio-engine.ts'
-import { FakeAudioContext } from './fakes.ts'
+import { FakeAudioContext, okSoundFetcher } from './fakes.ts'
 
 function makeEngine(ctx: FakeAudioContext, opts?: { now?: () => number }) {
   const clock = (): number => 0
   return createEngine({
     createContext: () => ctx as unknown as AudioContextLike,
     audioBase: '/t',
-    fetchImpl: async () => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(8) }),
+    fetchImpl: okSoundFetcher,
     visibility: () => 'visible',
     ...(opts?.now !== undefined ? { now: opts.now } : {}),
   })

@@ -156,10 +156,16 @@ export interface SlotFile {
   pack: boolean
 }
 
-/** 音效文件 URL:host 半注册的 /dsh-kachi 前缀路由。 */
+/**
+ * 音效文件 URL:host 半注册的 /dsh-kachi 前缀路由下的 JSON 封套端点
+ * (见 sound-envelope.ts:不用 .wav 路径、不用 audio 响应头,免被下载管理器拦截)。
+ * 池归属编码进 file 参数(`pack/<name>.wav` 与裸 `<name>.wav`),与
+ * host/sound-files.ts 的白名单同源。
+ */
 export function soundUrl(file: string, opts?: { pack?: boolean; base?: string }): string {
   const base = opts?.base ?? '/dsh-kachi'
-  return opts?.pack ? `${base}/sounds/pack/${file}` : `${base}/sounds/${file}`
+  const rel = opts?.pack ? `pack/${file}` : file
+  return `${base}/sound?file=${encodeURIComponent(rel)}`
 }
 
 /** 槽位中文标签(设置页 UI)。 */
