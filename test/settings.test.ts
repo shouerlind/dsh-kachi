@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createEngine, type AudioContextLike, volumeGain } from '../src/client/engine/audio-engine.ts'
-import { applyKachiSettings, shouldPlayBoot } from '../src/client/settings/policy.ts'
+import { applyKachiSettings, SETTINGS_CONSUMPTION, shouldPlayBoot } from '../src/client/settings/policy.ts'
 import { DEFAULT_SETTINGS, SETTINGS_NAMESPACE } from '../src/shared/settings.ts'
-import { DEFAULT_SLOT_SOUNDS } from '../src/shared/slots.ts'
+import { DEFAULT_SLOT_SOUNDS, toSlotFile } from '../src/shared/slots.ts'
 import { FakeAudioContext, FakeGain, FakeSource } from './fakes.ts'
 
 describe('共享设置形状(工单 #13/#14)', () => {
@@ -111,6 +111,44 @@ describe('设置应用策略(工单 #13/#14)', () => {
     expect(shouldPlayBoot({ ...DEFAULT_SETTINGS })).toBe(true)
     expect(shouldPlayBoot({ ...DEFAULT_SETTINGS, bootSound: false })).toBe(false)
     expect(shouldPlayBoot({ ...DEFAULT_SETTINGS, enabled: false })).toBe(false)
+  })
+
+  it('消费登记覆盖全部设置字段(新字段必须说明谁消费它)', () => {
+    expect(Object.keys(SETTINGS_CONSUMPTION).sort()).toEqual(Object.keys(DEFAULT_SETTINGS).sort())
+    for (const [field, who] of Object.entries(SETTINGS_CONSUMPTION)) {
+      expect(who, `field ${field}`).not.toBe('')
+    }
+  })
+
+  it('登记为 apply 的字段确实被写进引擎(新增字段漏接线会红)', () => {
+    const touched = new Set<string>()
+    const target = {
+      setEnabled: () => void touched.add('enabled'),
+      setMasterVolume: () => void touched.add('masterVolume'),
+      setThrottleMs: () => void touched.add('throttleMs'),
+      setSlotVolume: () => void touched.add('slotVolumes'),
+      setSlotSound: () => void touched.add('slotSounds'),
+      currentFile: () => undefined,
+    }
+    const registered = Object.entries(SETTINGS_CONSUMPTION)
+      .filter(([, who]) => who.includes('applyKachiSettings'))
+      .map(([field]) => field)
+      .sort()
+    applyKachiSettings(DEFAULT_SETTINGS, target)
+    expect([...touched].sort()).toEqual(registered)
+  })
+})
+
+describe('槽位文件归属(单一判定点)', () => {
+  it('toSlotFile:默认池文件走根目录,其余视为备选池', () => {
+    expect(toSlotFile('boot.wav')).toEqual({ file: 'boot.wav', pack: false })
+    expect(toSlotFile('SeNewsBad.wav')).toEqual({ file: 'SeNewsBad.wav', pack: true })
+  })
+
+  it('13 个默认槽位文件全部判为默认池', () => {
+    for (const file of Object.values(DEFAULT_SLOT_SOUNDS)) {
+      expect(toSlotFile(file).pack, file).toBe(false)
+    }
   })
 })
 

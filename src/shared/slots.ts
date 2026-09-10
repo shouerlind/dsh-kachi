@@ -94,58 +94,67 @@ export const EVENT_IDS = [
 export type EventId = (typeof EVENT_IDS)[number]
 
 /**
- * 事件 → 槽位/分级/事件音量。音量承载约定(单一承载层):
+ * 节流门禁种类(SPEC §4):事件行自述它走哪条闸,引擎不再按事件名分类。
+ *  - `slot`:按槽位去重,窗口 = 节流窗(setThrottleMs 可调)。
+ *  - `event`:按事件各自 50ms 计闸,不受节流窗影响(SPEC §4 例外②:确认槽
+ *    与 tool/result 同槽,槽位去重会吞掉快速连点面板的重开确认音)。
+ * 单声道打断不在此列 —— 那是槽位级授权(SPEC §4 例外①,MONOPHONIC_SLOTS)。
+ */
+export type ThrottleKind = 'slot' | 'event'
+
+export interface EventSound {
+  slot: SlotId
+  level: Level
+  volume: number
+  throttle: ThrottleKind
+}
+
+/**
+ * 事件 → 槽位/分级/事件音量/节流门禁。音量承载约定(单一承载层):
  * 槽位默认音量承载 SPEC §5 音量列的槽位主档位;事件 volume 仅作
  * 「同槽低于主档」的线性微降(如 tool-result-fail 70 / jobs-completed 60),
  * 与主档一致时恒为 100,不得与槽位叠乘。
  * 同一文件按事件以不同音量复用,音量变体不另建文件。
  */
-export const EVENT_SOUNDS: Record<EventId, { slot: SlotId; level: Level; volume: number }> = {
-  boot: { slot: 'boot', level: 'foreground', volume: 100 },
-  'approval-request': { slot: 'notifyImportant', level: 'intervention', volume: 100 },
-  'questions-request': { slot: 'notifyImportant', level: 'intervention', volume: 100 },
-  'turn-start': { slot: 'menuMove', level: 'foreground', volume: 100 },
-  'user-message': { slot: 'send', level: 'foreground', volume: 100 },
-  'turn-end-completed': { slot: 'taskComplete', level: 'intervention', volume: 100 },
-  'turn-end-error': { slot: 'error', level: 'intervention', volume: 100 },
-  'turn-end-cancelled': { slot: 'cancel', level: 'foreground', volume: 100 },
-  'tool-call': { slot: 'button', level: 'foreground', volume: 100 },
-  'tool-result-ok': { slot: 'confirm', level: 'foreground', volume: 100 },
-  'tool-result-fail': { slot: 'error', level: 'foreground', volume: 70 },
-  'session-added': { slot: 'sessionNew', level: 'foreground', volume: 100 },
-  'session-removed': { slot: 'sessionClose', level: 'foreground', volume: 100 },
-  'session-error': { slot: 'error', level: 'intervention', volume: 100 },
-  'jobs-completed': { slot: 'taskComplete', level: 'foreground', volume: 60 },
-  'jobs-failed': { slot: 'error', level: 'intervention', volume: 100 },
-  reconnecting: { slot: 'warn', level: 'foreground', volume: 100 },
-  reconnected: { slot: 'reconnect', level: 'foreground', volume: 100 },
-  'own-click': { slot: 'button', level: 'foreground', volume: 100 },
+export const EVENT_SOUNDS: Record<EventId, EventSound> = {
+  boot: { slot: 'boot', level: 'foreground', volume: 100, throttle: 'slot' },
+  'approval-request': { slot: 'notifyImportant', level: 'intervention', volume: 100, throttle: 'slot' },
+  'questions-request': { slot: 'notifyImportant', level: 'intervention', volume: 100, throttle: 'slot' },
+  'turn-start': { slot: 'menuMove', level: 'foreground', volume: 100, throttle: 'slot' },
+  'user-message': { slot: 'send', level: 'foreground', volume: 100, throttle: 'slot' },
+  'turn-end-completed': { slot: 'taskComplete', level: 'intervention', volume: 100, throttle: 'slot' },
+  'turn-end-error': { slot: 'error', level: 'intervention', volume: 100, throttle: 'slot' },
+  'turn-end-cancelled': { slot: 'cancel', level: 'foreground', volume: 100, throttle: 'slot' },
+  'tool-call': { slot: 'button', level: 'foreground', volume: 100, throttle: 'slot' },
+  'tool-result-ok': { slot: 'confirm', level: 'foreground', volume: 100, throttle: 'slot' },
+  'tool-result-fail': { slot: 'error', level: 'foreground', volume: 70, throttle: 'slot' },
+  'session-added': { slot: 'sessionNew', level: 'foreground', volume: 100, throttle: 'slot' },
+  'session-removed': { slot: 'sessionClose', level: 'foreground', volume: 100, throttle: 'slot' },
+  'session-error': { slot: 'error', level: 'intervention', volume: 100, throttle: 'slot' },
+  'jobs-completed': { slot: 'taskComplete', level: 'foreground', volume: 60, throttle: 'slot' },
+  'jobs-failed': { slot: 'error', level: 'intervention', volume: 100, throttle: 'slot' },
+  reconnecting: { slot: 'warn', level: 'foreground', volume: 100, throttle: 'slot' },
+  reconnected: { slot: 'reconnect', level: 'foreground', volume: 100, throttle: 'slot' },
+  'own-click': { slot: 'button', level: 'foreground', volume: 100, throttle: 'slot' },
   // composer 交互音(SPEC §5 行 21-24):volume 全 100,档位由槽位默认音量
   // 承接(confirm@80 / menuMove@40 / cancel@90;确认与取消刻意接近但保留
-  // 取消略重 —— 用户决议「不要差太大,也要有点差距」)。
-  'menu-open': { slot: 'confirm', level: 'foreground', volume: 100 },
-  'menu-move': { slot: 'menuMove', level: 'foreground', volume: 100 },
-  'menu-item-click': { slot: 'confirm', level: 'foreground', volume: 100 },
-  'menu-close': { slot: 'cancel', level: 'foreground', volume: 100 },
+  // 取消略重 —— 用户决议「不要差太大,也要有点差距」)。节流一律按事件
+  // 各自计闸(SPEC §4 例外②)。
+  'menu-open': { slot: 'confirm', level: 'foreground', volume: 100, throttle: 'event' },
+  'menu-move': { slot: 'menuMove', level: 'foreground', volume: 100, throttle: 'event' },
+  'menu-item-click': { slot: 'confirm', level: 'foreground', volume: 100, throttle: 'event' },
+  'menu-close': { slot: 'cancel', level: 'foreground', volume: 100, throttle: 'event' },
   // 全站按钮泛化(2026-09-08,§5 行 25/26):点击=按键音,悬停/键盘焦点=
   // 菜单移动音;音量由槽位默认档承接(button@30 / menuMove@40)。
-  'ui-click': { slot: 'button', level: 'foreground', volume: 100 },
-  'ui-hover': { slot: 'menuMove', level: 'foreground', volume: 100 },
+  'ui-click': { slot: 'button', level: 'foreground', volume: 100, throttle: 'event' },
+  'ui-hover': { slot: 'menuMove', level: 'foreground', volume: 100, throttle: 'event' },
 }
 
-/**
- * 介入级事件白名单 = 后台可发声的固定清单(CONTEXT.md「重要通知白名单」,
- * 变更需显式决议)。字面量固定清单,不随 level 字段自动派生。
- * 语义四类:审批请求、agent 提问、回合错误(回合/会话/作业失败)、任务完成。
- */
-export const INTERVENTION_EVENT_IDS: ReadonlySet<EventId> = new Set<EventId>([
-  'approval-request',
-  'questions-request',
-  'turn-end-completed',
-  'turn-end-error',
-  'session-error',
-  'jobs-failed',
-])
+/** 槽位当前指向的音效文件(pack = 选自备选池,URL 走 /sounds/pack/ 前缀)。 */
+export interface SlotFile {
+  file: string
+  pack: boolean
+}
 
 /** 音效文件 URL:host 半注册的 /dsh-kachi 前缀路由。 */
 export function soundUrl(file: string, opts?: { pack?: boolean; base?: string }): string {
@@ -171,20 +180,6 @@ export const SLOT_LABELS: Record<SlotId, string> = {
 }
 
 /**
- * 交互音事件(SPEC §5 行 21-24):绕开槽位 200ms 去重(那是给工具调用高频
- * 事件设计的,会吞掉快速连点面板的重开确认音),引擎按事件 50ms 最小间隔
- * 放行。菜单移动音另享单声道打断(下方 MONOPHONIC_SLOTS)。
- */
-export const INTERACTION_EVENT_IDS: ReadonlySet<EventId> = new Set<EventId>([
-  'menu-open',
-  'menu-move',
-  'menu-item-click',
-  'menu-close',
-  'ui-click',
-  'ui-hover',
-])
-
-/**
  * 单声道槽位(SPEC §4 节流例外①,按槽位授权):menuMove 槽内全部事件
  * (菜单移动音、借用该槽位的回合开始音)不套 200ms 去重,改用固定 50ms
  * 最小间隔,且新响立即打断上一响(不叠加)。
@@ -192,10 +187,18 @@ export const INTERACTION_EVENT_IDS: ReadonlySet<EventId> = new Set<EventId>([
 export const MONOPHONIC_SLOTS: ReadonlySet<SlotId> = new Set<SlotId>(['menuMove'])
 export const MONOPHONIC_MIN_INTERVAL_MS = 50
 
-/** 交互音事件的最小间隔(ms):绕开槽位 200ms 去重,按事件各自计闸。 */
+/** 按事件计闸的最小间隔(ms):事件行 throttle === 'event' 时各自计闸,不受节流窗影响。 */
 export const INTERACTION_MIN_INTERVAL_MS = 50
 
-/** 是否 13 个默认槽位文件之一(根目录);否则视为 pack 池内文件。 */
+/** 是否 13 个默认槽位文件之一(根目录);否则视为备选池内文件。 */
 export function isDefaultSound(file: string): boolean {
   return (Object.values(DEFAULT_SLOT_SOUNDS) as string[]).includes(file)
+}
+
+/**
+ * 文件名 → 播放目标。池归属(默认池根目录 / 备选池 pack 子目录)只在这里
+ * 判定一次:调用方拿文件名字符串即可,不必各自推导 pack。
+ */
+export function toSlotFile(file: string): SlotFile {
+  return { file, pack: !isDefaultSound(file) }
 }

@@ -7,12 +7,12 @@ import {
   DEFAULT_SLOT_SOUNDS,
   DEFAULT_SLOT_VOLUMES,
   EVENT_SOUNDS,
-  INTERACTION_EVENT_IDS,
   INTERACTION_MIN_INTERVAL_MS,
   MONOPHONIC_MIN_INTERVAL_MS,
   MONOPHONIC_SLOTS,
   SLOT_IDS,
   soundUrl,
+  type SlotFile,
   type SlotId,
 } from '../../shared/slots.ts'
 
@@ -57,11 +57,7 @@ export interface EngineOptions {
   now?: () => number
 }
 
-/** 槽位当前指向的音效文件(pack = 选自全包池,URL 走 /sounds/pack/ 前缀)。 */
-export interface SlotFile {
-  file: string
-  pack: boolean
-}
+/** 槽位当前指向的音效文件见 shared/slots.ts(SlotFile:文件 + 所属池)。 */
 
 export interface Engine {
   /** 首次用户手势时调用;成功返回 true(幂等)。失败保持 suspended,后续手势可重试。 */
@@ -132,8 +128,8 @@ export function createEngine(options: EngineOptions): Engine {
   let throttleMs = 200
   const lastPlayedAt = new Map<SlotId, number>()
   const activeSources = new Map<SlotId, SourceNodeLike>()
-  // 交互音事件闸:按事件 id 计时,不受 setThrottleMs 影响。
-  const lastInteractionAt = new Map<string, number>()
+  // 按事件计闸的时间戳(throttle === 'event' 的行;不受 setThrottleMs 影响)。
+  const lastEventGateAt = new Map<string, number>()
 
   function bufferKey(slotFile: SlotFile): string {
     return slotFile.pack ? `pack/${slotFile.file}` : slotFile.file
@@ -180,16 +176,16 @@ export function createEngine(options: EngineOptions): Engine {
       if (!mapping) return
       // 后台策略:hidden 仅介入级(SPEC §4 白名单)。
       if (visibility() === 'hidden' && mapping.level !== 'intervention') return
-      // 节流(SPEC §4):默认按槽位 200ms 去重(setThrottleMs 可调),闸后立即
-      // 占位防并发同槽在解码窗内双响。两类例外:
-      //  - 单声道槽位(菜单移动音):固定 50ms 最小间隔替代 200ms 去重;
-      //  - 交互音事件:按事件 50ms 计闸 —— 确认槽与 tool/result 同槽,槽位
-      //    200ms 去重会吞掉快速连点面板时的重开确认音(实机踩坑)。
+      // 节流门禁由事件行自述(mapping.throttle,SPEC §4):闸的种类不在引擎里
+      // 认事件名。闸后立即占位防并发同槽在解码窗内双响。三类走法:
+      //  - throttle==='event':按事件各自 50ms 计闸,不受节流窗影响(例外②);
+      //  - 单声道槽位:固定 50ms 最小间隔替代节流窗(例外①);
+      //  - 其余:按槽位套节流窗(默认 200ms,setThrottleMs 可调)。
       const monophonic = MONOPHONIC_SLOTS.has(mapping.slot)
-      if (INTERACTION_EVENT_IDS.has(eventId)) {
-        const lastAt = lastInteractionAt.get(eventId)
+      if (mapping.throttle === 'event') {
+        const lastAt = lastEventGateAt.get(eventId)
         if (lastAt !== undefined && now() - lastAt < INTERACTION_MIN_INTERVAL_MS) return
-        lastInteractionAt.set(eventId, now())
+        lastEventGateAt.set(eventId, now())
       } else {
         const windowMs = monophonic ? MONOPHONIC_MIN_INTERVAL_MS : throttleMs
         const playedAt = lastPlayedAt.get(mapping.slot)

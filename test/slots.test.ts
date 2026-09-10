@@ -3,7 +3,6 @@ import {
   DEFAULT_SLOT_SOUNDS,
   DEFAULT_SLOT_VOLUMES,
   EVENT_SOUNDS,
-  INTERVENTION_EVENT_IDS,
   SLOT_IDS,
   soundUrl,
 } from '../src/shared/slots.ts'
@@ -51,7 +50,14 @@ describe('事件 → 音效映射(SPEC §5)', () => {
   it('介入级白名单 = 全部介入级事件:审批请求、agent 提问、回合错误(回合/会话/作业)、任务完成', () => {
     // 白名单四类是语义概括;事件面实例以 SPEC §5 各行「介入」标记为准。
     // 作业失败归入错误语义类(SPEC §5 行 15 介入级)。
-    expect([...INTERVENTION_EVENT_IDS].sort()).toEqual(
+    // 单一真相:白名单就是「level === 'intervention' 的事件集合」(CONTEXT.md
+    // 「重要通知白名单」),生产只读 level;下面这份字面量清单是规格锚 ——
+    // 变更白名单必须显式决议,漂移在这里红。
+    const intervention = Object.entries(EVENT_SOUNDS)
+      .filter(([, mapping]) => mapping.level === 'intervention')
+      .map(([id]) => id)
+      .sort()
+    expect(intervention).toEqual(
       [
         'approval-request',
         'jobs-failed',
@@ -73,13 +79,25 @@ describe('事件 → 音效映射(SPEC §5)', () => {
     expect(EVENT_SOUNDS['jobs-failed']).toMatchObject({ slot: 'error', level: 'intervention', volume: 100 })
   })
 
-  it('所有事件的音量都在 1-100,槽位都在槽位表内', () => {
+  it('所有事件的音量都在 1-100,槽位都在槽位表内,且都声明了门禁', () => {
     for (const [id, mapping] of Object.entries(EVENT_SOUNDS)) {
       expect(SLOT_IDS, `event ${id}`).toContain(mapping.slot)
       expect(mapping.volume, `event ${id}`).toBeGreaterThanOrEqual(1)
       expect(mapping.volume, `event ${id}`).toBeLessThanOrEqual(100)
       expect(['intervention', 'foreground'], `event ${id}`).toContain(mapping.level)
+      expect(['slot', 'event'], `event ${id}`).toContain(mapping.throttle)
     }
+  })
+
+  it('按事件计闸的清单固定为交互音六事件(SPEC §4 例外②)', () => {
+    // 规格锚:门禁是事件行声明,引擎不认事件名;改这张清单须显式决议。
+    const perEvent = Object.entries(EVENT_SOUNDS)
+      .filter(([, m]) => m.throttle === 'event')
+      .map(([id]) => id)
+      .sort()
+    expect(perEvent).toEqual(
+      ['menu-close', 'menu-item-click', 'menu-move', 'menu-open', 'ui-click', 'ui-hover'].sort(),
+    )
   })
 
   it('断线警示音量由 warn 槽默认承载 @90,重连恢复 @100', () => {
